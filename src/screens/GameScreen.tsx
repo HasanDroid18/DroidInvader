@@ -8,22 +8,27 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { sfx } from '../audio/sfx';
 import { PixelSprite } from '../components/PixelSprite';
+import { RetroButton } from '../components/RetroButton';
 import { Starfield } from '../components/Starfield';
-import { COLORS, PIXEL } from '../constants';
+import { PIXEL, BOSS_PIXEL } from '../constants';
 import { createGameState, step } from '../game/engine';
-import { GameState, StepInput } from '../game/types';
+import { GameState, RunOptions, StepEvents, StepInput } from '../game/types';
+import { isBossWave } from '../game/waves';
 import {
+  BOSS,
   BUG,
+  COIN,
   ERROR_GLYPH,
   PixelMap,
   POWERUP_DOUBLE,
   POWERUP_LIFE,
   POWERUP_RAPID,
-  SPIDER,
   WARN_GLYPH,
 } from '../sprites';
-import { FONT } from '../ui';
+import { GAME_COLORS } from '../theme/palettes';
+import { FONT, useTheme } from '../theme/ThemeContext';
 
 const ENEMY_SPRITES: Record<'bug' | 'error' | 'warn', PixelMap> = {
   bug: BUG,
@@ -37,16 +42,46 @@ const POWERUP_SPRITES = {
   life: POWERUP_LIFE,
 } as const;
 
-interface Props {
-  onGameOver: (score: number, wave: number) => void;
-  onQuit: () => void;
+interface RunResult {
+  score: number;
+  wave: number;
+  coins: number;
 }
 
-export function GameScreen({ onGameOver, onQuit }: Props) {
+interface Props {
+  runOptions: RunOptions;
+  onGameOver: (result: RunResult) => void;
+  onQuit: (result: RunResult) => void;
+}
+
+function playStepSfx(ev: StepEvents) {
+  // Priority order: one haptic per frame, but sounds can overlap.
+  if (ev.shot) sfx.play('shoot');
+  if (ev.hit) sfx.play('hit');
+  if (ev.coin) sfx.play('coin');
+  if (ev.powerup) sfx.play('powerup');
+  if (ev.bossDefeated) sfx.play('explosion');
+  else if (ev.enemyKilled) sfx.play('explosion');
+  if (ev.playerHit) sfx.play('playerHit');
+  if (ev.waveCleared) sfx.play('wave');
+
+  if (ev.playerHit) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+  } else if (ev.powerup || ev.coin) {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  } else if (ev.enemyKilled) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  }
+}
+
+export function GameScreen({ runOptions, onGameOver, onQuit }: Props) {
   const { width, height } = useWindowDimensions();
+  const { palette, spiderMap, spiderHex } = useTheme();
 
   const stateRef = useRef<GameState | null>(null);
-  if (stateRef.current == null) stateRef.current = createGameState(width, height);
+  if (stateRef.current == null) {
+    stateRef.current = createGameState(width, height, { ...runOptions, spiderColorHex: spiderHex });
+  }
 
   const [, forceRender] = useReducer((c: number) => c + 1, 0);
   const [paused, setPaused] = useState(false);
@@ -55,6 +90,7 @@ export function GameScreen({ onGameOver, onQuit }: Props) {
   const dragStart = useRef({ playerX: 0, playerY: 0, touchX: 0, touchY: 0 });
   const callbacksRef = useRef({ onGameOver, onQuit });
   callbacksRef.current = { onGameOver, onQuit };
+  const bossAnnouncedRef = useRef(false);
 
   const setPausedBoth = (v: boolean) => {
     pausedRef.current = v;
@@ -110,21 +146,27 @@ export function GameScreen({ onGameOver, onQuit }: Props) {
 
       const s = stateRef.current!;
       const ev = step(s, dt, inputRef.current);
+      playStepSfx(ev);
 
-      if (ev.playerHit) {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-      } else if (ev.powerup) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      } else if (ev.enemyKilled) {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      // Announce the boss the moment its wave banner appears.
+      if (s.boss && !bossAnnouncedRef.current) {
+        bossAnnouncedRef.current = true;
+        sfx.play('boss');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      } else if (!s.boss) {
+        bossAnnouncedRef.current = false;
       }
 
       if (ev.gameOver) {
         alive = false;
         cancelAnimationFrame(raf);
+        sfx.play('gameOver');
         // Let the final explosion render once before switching screens.
         forceRender();
-        setTimeout(() => callbacksRef.current.onGameOver(s.score, s.wave), 650);
+        setTimeout(
+          () => callbacksRef.current.onGameOver({ score: s.score, wave: s.wave, coins: s.runCoins }),
+          650
+        );
         return;
       }
       forceRender();
@@ -139,9 +181,10 @@ export function GameScreen({ onGameOver, onQuit }: Props) {
 
   const s = stateRef.current;
   const blinking = s.player.invulnTime > 0 && Math.floor(s.time * 12) % 2 === 0;
+  const bossWave = isBossWave(s.wave);
 
   return (
-    <View style={styles.container} {...pan.panHandlers}>
+    <View style={[styles.container, { backgroundColor: palette.bg }]} {...pan.panHandlers}>
       <Starfield />
 
       {/* particles */}
@@ -161,6 +204,20 @@ export function GameScreen({ onGameOver, onQuit }: Props) {
           }}
         />
       ))}
+
+      {/* boss */}
+      {s.boss && (
+        <View
+          pointerEvents="none"
+          style={[styles.entity, { transform: [{ translateX: s.boss.x }, { translateY: s.boss.y }] }]}
+        >
+          <PixelSprite
+            map={BOSS}
+            pixel={BOSS_PIXEL}
+            style={s.boss.flashTime > 0 ? styles.hitFlash : undefined}
+          />
+        </View>
+      )}
 
       {/* enemies */}
       {s.enemies.map((e) => (
@@ -184,7 +241,7 @@ export function GameScreen({ onGameOver, onQuit }: Props) {
           pointerEvents="none"
           style={[
             styles.bullet,
-            { width: b.w, height: b.h, backgroundColor: COLORS.playerBullet },
+            { width: b.w, height: b.h, backgroundColor: palette.playerBullet },
             { transform: [{ translateX: b.x }, { translateY: b.y }] },
           ]}
         />
@@ -195,13 +252,22 @@ export function GameScreen({ onGameOver, onQuit }: Props) {
           pointerEvents="none"
           style={[
             styles.bullet,
-            { width: b.w, height: b.h, backgroundColor: COLORS.enemyBullet },
+            { width: b.w, height: b.h, backgroundColor: GAME_COLORS.enemyBullet },
             { transform: [{ translateX: b.x }, { translateY: b.y }] },
           ]}
         />
       ))}
 
-      {/* powerups */}
+      {/* coins & powerups */}
+      {s.coinDrops.map((c) => (
+        <View
+          key={c.id}
+          pointerEvents="none"
+          style={[styles.entity, { transform: [{ translateX: c.x }, { translateY: c.y }] }]}
+        >
+          <PixelSprite map={COIN} pixel={3} />
+        </View>
+      ))}
       {s.powerups.map((pu) => (
         <View
           key={pu.id}
@@ -224,33 +290,67 @@ export function GameScreen({ onGameOver, onQuit }: Props) {
             },
           ]}
         >
-          <PixelSprite map={SPIDER} pixel={PIXEL} />
+          <PixelSprite map={spiderMap} pixel={PIXEL} />
+        </View>
+      )}
+
+      {/* boss health bar */}
+      {s.boss && (
+        <View style={styles.bossBarWrap} pointerEvents="none">
+          <Text style={[styles.bossBarLabel, { color: GAME_COLORS.boss }]}>
+            BOSS · TIER {s.boss.tier}
+          </Text>
+          <View style={[styles.bossBarTrack, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
+            <View
+              style={[
+                styles.bossBarFill,
+                { backgroundColor: GAME_COLORS.boss, width: `${Math.max((s.boss.hp / s.boss.maxHp) * 100, 0)}%` },
+              ]}
+            />
+          </View>
         </View>
       )}
 
       {/* HUD */}
       <View style={styles.hud} pointerEvents="box-none">
         <View>
-          <Text style={styles.hudLabel}>SCORE</Text>
-          <Text style={styles.hudScore}>{s.score}</Text>
+          <Text style={[styles.hudLabel, { color: palette.textDim }]}>SCORE</Text>
+          <Text style={[styles.hudScore, { color: palette.text }]}>{s.score}</Text>
           <View style={styles.livesRow}>
             {Array.from({ length: s.lives }).map((_, i) => (
-              <PixelSprite key={i} map={SPIDER} pixel={1.4} style={styles.lifeIcon} />
+              <PixelSprite key={i} map={spiderMap} pixel={1.4} style={styles.lifeIcon} />
             ))}
           </View>
         </View>
-        <Text style={styles.hudWave}>WAVE {s.wave}</Text>
+        <View style={styles.hudCenter}>
+          <Text style={[styles.hudWave, { color: palette.textDim }]}>WAVE {s.wave}</Text>
+          <View style={styles.hudCoins}>
+            <PixelSprite map={COIN} pixel={2} />
+            <Text style={[styles.hudCoinText, { color: palette.text }]}>{s.runCoins}</Text>
+          </View>
+        </View>
         <Pressable onPress={() => setPausedBoth(true)} style={styles.pauseButton} hitSlop={12}>
-          <Text style={styles.pauseGlyph}>❚❚</Text>
+          <Text style={[styles.pauseGlyph, { color: palette.textDim }]}>❚❚</Text>
         </Pressable>
       </View>
 
       {/* status pills */}
-      {(s.player.rapidTime > 0 || s.player.weapon === 'double') && (
+      {(s.player.rapidTime > 0 || s.player.weapon === 'double' || s.scoreMultTime > 0) && (
         <View style={styles.pillRow} pointerEvents="none">
-          {s.player.weapon === 'double' && <Text style={styles.pill}>DOUBLE SHOT</Text>}
+          {s.player.weapon === 'double' && (
+            <Text style={[styles.pill, { color: GAME_COLORS.powerDouble, borderColor: GAME_COLORS.powerDouble }]}>
+              DOUBLE SHOT
+            </Text>
+          )}
           {s.player.rapidTime > 0 && (
-            <Text style={[styles.pill, styles.pillRapid]}>RAPID {Math.ceil(s.player.rapidTime)}</Text>
+            <Text style={[styles.pill, { color: GAME_COLORS.powerRapid, borderColor: GAME_COLORS.powerRapid }]}>
+              RAPID {Math.ceil(s.player.rapidTime)}
+            </Text>
+          )}
+          {s.scoreMultTime > 0 && (
+            <Text style={[styles.pill, { color: GAME_COLORS.coin, borderColor: GAME_COLORS.coin }]}>
+              X2 SCORE {Math.ceil(s.scoreMultTime)}
+            </Text>
           )}
         </View>
       )}
@@ -258,23 +358,25 @@ export function GameScreen({ onGameOver, onQuit }: Props) {
       {/* wave banner */}
       {s.waveBannerTime > 0 && (
         <View style={styles.bannerWrap} pointerEvents="none">
-          <Text style={styles.banner}>WAVE {s.wave}</Text>
+          <Text style={[styles.banner, { color: bossWave ? GAME_COLORS.boss : palette.accent }]}>
+            {bossWave ? `⚠ BOSS ${s.wave / 10} ⚠` : `WAVE ${s.wave}`}
+          </Text>
         </View>
       )}
 
       {/* pause overlay */}
       {paused && (
-        <View style={styles.pauseOverlay}>
-          <Text style={styles.pausedText}>PAUSED</Text>
-          <Pressable
-            onPress={() => setPausedBoth(false)}
-            style={({ pressed }) => [styles.resumeButton, pressed && styles.resumePressed]}
-          >
-            <Text style={styles.resumeText}>RESUME</Text>
-          </Pressable>
-          <Pressable onPress={() => callbacksRef.current.onQuit()} style={styles.quitButton} hitSlop={8}>
-            <Text style={styles.quitText}>QUIT TO MENU</Text>
-          </Pressable>
+        <View style={[styles.pauseOverlay, { backgroundColor: palette.overlay }]}>
+          <Text style={[styles.pausedText, { color: palette.text }]}>PAUSED</Text>
+          <RetroButton label="RESUME" onPress={() => setPausedBoth(false)} style={styles.resume} />
+          <RetroButton
+            label="QUIT TO MENU"
+            variant="ghost"
+            size="small"
+            onPress={() =>
+              callbacksRef.current.onQuit({ score: s.score, wave: s.wave, coins: s.runCoins })
+            }
+          />
         </View>
       )}
     </View>
@@ -284,7 +386,6 @@ export function GameScreen({ onGameOver, onQuit }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.bg,
     overflow: 'hidden',
   },
   entity: {
@@ -301,6 +402,30 @@ const styles = StyleSheet.create({
     top: 0,
     borderRadius: 2,
   },
+  bossBarWrap: {
+    position: 'absolute',
+    top: 92,
+    left: 40,
+    right: 40,
+    alignItems: 'center',
+  },
+  bossBarLabel: {
+    fontFamily: FONT,
+    fontSize: 10,
+    letterSpacing: 2,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  bossBarTrack: {
+    height: 8,
+    borderWidth: 1,
+    borderRadius: 4,
+    width: '100%',
+    overflow: 'hidden',
+  },
+  bossBarFill: {
+    height: '100%',
+  },
   hud: {
     position: 'absolute',
     top: 54,
@@ -314,20 +439,31 @@ const styles = StyleSheet.create({
     fontFamily: FONT,
     fontSize: 10,
     letterSpacing: 2,
-    color: COLORS.dim,
   },
   hudScore: {
     fontFamily: FONT,
     fontSize: 22,
     fontWeight: 'bold',
-    color: COLORS.ivory,
   },
   hudWave: {
     fontFamily: FONT,
     fontSize: 13,
     letterSpacing: 2,
-    color: COLORS.dim,
     marginTop: 4,
+  },
+  hudCenter: {
+    alignItems: 'center',
+  },
+  hudCoins: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  hudCoinText: {
+    fontFamily: FONT,
+    fontSize: 13,
+    fontWeight: 'bold',
+    marginLeft: 5,
   },
   livesRow: {
     flexDirection: 'row',
@@ -342,11 +478,10 @@ const styles = StyleSheet.create({
   pauseGlyph: {
     fontFamily: FONT,
     fontSize: 16,
-    color: COLORS.dim,
   },
   pillRow: {
     position: 'absolute',
-    top: 120,
+    top: 124,
     left: 18,
     flexDirection: 'row',
   },
@@ -354,18 +489,12 @@ const styles = StyleSheet.create({
     fontFamily: FONT,
     fontSize: 10,
     letterSpacing: 1,
-    color: COLORS.powerDouble,
-    borderColor: COLORS.powerDouble,
     borderWidth: 1,
     borderRadius: 3,
     paddingHorizontal: 6,
     paddingVertical: 2,
     marginRight: 8,
     overflow: 'hidden',
-  },
-  pillRapid: {
-    color: COLORS.powerRapid,
-    borderColor: COLORS.powerRapid,
   },
   bannerWrap: {
     position: 'absolute',
@@ -381,7 +510,6 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     letterSpacing: 8,
-    color: COLORS.terracotta,
   },
   pauseOverlay: {
     position: 'absolute',
@@ -389,7 +517,6 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: COLORS.overlay,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -397,34 +524,11 @@ const styles = StyleSheet.create({
     fontFamily: FONT,
     fontSize: 30,
     letterSpacing: 8,
-    color: COLORS.ivory,
     fontWeight: 'bold',
     marginBottom: 34,
   },
-  resumeButton: {
-    backgroundColor: COLORS.terracotta,
-    paddingHorizontal: 44,
-    paddingVertical: 14,
-    borderRadius: 4,
+  resume: {
     marginBottom: 18,
-  },
-  resumePressed: {
-    backgroundColor: COLORS.terracottaDark,
-  },
-  resumeText: {
-    fontFamily: FONT,
-    fontSize: 17,
-    fontWeight: 'bold',
-    color: COLORS.bg,
-    letterSpacing: 4,
-  },
-  quitButton: {
-    padding: 6,
-  },
-  quitText: {
-    fontFamily: FONT,
-    fontSize: 13,
-    letterSpacing: 3,
-    color: COLORS.dim,
+    minWidth: 200,
   },
 });

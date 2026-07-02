@@ -1,22 +1,20 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { COLORS } from '../constants';
+import { useTheme } from '../theme/ThemeContext';
 
 interface Star {
   x: number;
   y: number;
   size: number;
-  color: string;
 }
 
-function makeStars(count: number, w: number, h: number, size: number, color: string): Star[] {
+function makeStars(count: number, w: number, h: number, size: number): Star[] {
   const stars: Star[] = [];
   for (let i = 0; i < count; i++) {
     stars.push({
       x: Math.random() * w,
       y: Math.random() * h,
       size: size + Math.random() * size,
-      color,
     });
   }
   return stars;
@@ -26,7 +24,7 @@ function makeStars(count: number, w: number, h: number, size: number, color: str
 // vertically, and translated by exactly one screen-height per cycle.
 function StarLayer({ duration, count, size, color }: { duration: number; count: number; size: number; color: string }) {
   const { width, height } = useWindowDimensions();
-  const stars = useMemo(() => makeStars(count, width, height, size, color), [width, height, count, size, color]);
+  const stars = useMemo(() => makeStars(count, width, height, size), [width, height, count, size]);
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -56,7 +54,7 @@ function StarLayer({ duration, count, size, color }: { duration: number; count: 
               top: s.y + offset,
               width: s.size,
               height: s.size,
-              backgroundColor: s.color,
+              backgroundColor: color,
             }}
           />
         ))
@@ -66,10 +64,11 @@ function StarLayer({ duration, count, size, color }: { duration: number; count: 
 }
 
 export function Starfield() {
+  const { palette } = useTheme();
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <StarLayer duration={34000} count={26} size={1.5} color={COLORS.star} />
-      <StarLayer duration={19000} count={14} size={2.2} color={COLORS.starBright} />
+      <StarLayer duration={34000} count={26} size={1.5} color={palette.star} />
+      <StarLayer duration={19000} count={14} size={2.2} color={palette.starBright} />
     </View>
   );
 }

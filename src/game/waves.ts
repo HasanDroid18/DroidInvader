@@ -23,6 +23,11 @@ export interface WaveParams {
   hpBonus: number; // extra hp on every enemy
 }
 
+// Every 10th wave is a boss fight instead of a formation.
+export function isBossWave(n: number): boolean {
+  return n > 0 && n % 10 === 0;
+}
+
 export function waveParams(n: number): WaveParams {
   return {
     cols: Math.min(5 + Math.floor(n / 3), 8),
@@ -82,6 +87,7 @@ export function createWave(
         h: size.h,
         vx: 0,
         vy: 0,
+        phase: 0,
         fireCooldown: kind === 'warn' ? 1 + rng() * p.fireInterval * 2 : 0,
         flashTime: 0,
       });

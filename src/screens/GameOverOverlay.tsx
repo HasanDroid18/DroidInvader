@@ -1,34 +1,48 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { COLORS } from '../constants';
-import { FONT } from '../ui';
+import { StyleSheet, Text, View } from 'react-native';
+import { PixelSprite } from '../components/PixelSprite';
+import { RetroButton } from '../components/RetroButton';
+import { COIN } from '../sprites';
+import { GAME_COLORS } from '../theme/palettes';
+import { FONT, useTheme } from '../theme/ThemeContext';
 
 interface Props {
   score: number;
   wave: number;
+  coinsEarned: number;
   highScore: number;
   isNewBest: boolean;
   onRetry: () => void;
   onMenu: () => void;
 }
 
-export function GameOverOverlay({ score, wave, highScore, isNewBest, onRetry, onMenu }: Props) {
+export function GameOverOverlay({
+  score,
+  wave,
+  coinsEarned,
+  highScore,
+  isNewBest,
+  onRetry,
+  onMenu,
+}: Props) {
+  const { palette } = useTheme();
+
   return (
     <View style={styles.container}>
       <Text style={styles.gameOver}>GAME OVER</Text>
-      <Text style={styles.waveText}>REACHED WAVE {wave}</Text>
-      <Text style={styles.score}>{score}</Text>
+      <Text style={[styles.waveText, { color: palette.textDim }]}>REACHED WAVE {wave}</Text>
+      <Text style={[styles.score, { color: palette.text }]}>{score}</Text>
       {isNewBest ? (
         <Text style={styles.newBest}>★ NEW BEST ★</Text>
       ) : (
-        <Text style={styles.best}>BEST  {highScore}</Text>
+        <Text style={[styles.best, { color: palette.textDim }]}>BEST  {highScore}</Text>
       )}
-      <Pressable onPress={onRetry} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
-        <Text style={styles.buttonText}>PLAY AGAIN</Text>
-      </Pressable>
-      <Pressable onPress={onMenu} style={({ pressed }) => [styles.buttonGhost, pressed && styles.pressedGhost]}>
-        <Text style={styles.buttonGhostText}>MENU</Text>
-      </Pressable>
+      <View style={styles.coinsRow}>
+        <PixelSprite map={COIN} pixel={3} />
+        <Text style={[styles.coinsText, { color: palette.text }]}>+{coinsEarned}</Text>
+      </View>
+      <RetroButton label="PLAY AGAIN" onPress={onRetry} style={styles.retry} />
+      <RetroButton label="MENU" onPress={onMenu} variant="ghost" size="small" style={styles.menu} />
     </View>
   );
 }
@@ -44,20 +58,18 @@ const styles = StyleSheet.create({
     fontFamily: FONT,
     fontSize: 34,
     letterSpacing: 8,
-    color: COLORS.errorRed,
+    color: GAME_COLORS.errorRed,
     fontWeight: 'bold',
   },
   waveText: {
     fontFamily: FONT,
     fontSize: 13,
     letterSpacing: 3,
-    color: COLORS.dim,
     marginTop: 10,
   },
   score: {
     fontFamily: FONT,
     fontSize: 56,
-    color: COLORS.ivory,
     fontWeight: 'bold',
     marginVertical: 14,
   },
@@ -65,47 +77,31 @@ const styles = StyleSheet.create({
     fontFamily: FONT,
     fontSize: 16,
     letterSpacing: 3,
-    color: COLORS.warnYellow,
-    marginBottom: 34,
+    color: GAME_COLORS.warnYellow,
+    marginBottom: 16,
   },
   best: {
     fontFamily: FONT,
     fontSize: 14,
     letterSpacing: 3,
-    color: COLORS.dim,
-    marginBottom: 34,
+    marginBottom: 16,
   },
-  button: {
-    backgroundColor: COLORS.terracotta,
-    paddingHorizontal: 44,
-    paddingVertical: 14,
-    borderRadius: 4,
-    marginBottom: 14,
+  coinsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 30,
   },
-  pressed: {
-    backgroundColor: COLORS.terracottaDark,
-  },
-  buttonText: {
+  coinsText: {
     fontFamily: FONT,
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.bg,
-    letterSpacing: 4,
+    marginLeft: 8,
   },
-  buttonGhost: {
-    borderColor: COLORS.dim,
-    borderWidth: 1,
-    paddingHorizontal: 44,
-    paddingVertical: 12,
-    borderRadius: 4,
+  retry: {
+    marginBottom: 14,
+    minWidth: 240,
   },
-  pressedGhost: {
-    borderColor: COLORS.ivory,
-  },
-  buttonGhostText: {
-    fontFamily: FONT,
-    fontSize: 15,
-    color: COLORS.ivory,
-    letterSpacing: 4,
+  menu: {
+    minWidth: 140,
   },
 });

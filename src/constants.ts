@@ -1,35 +1,15 @@
-// Central palette + game tuning. Pure TS (no react-native imports) so the
-// game logic stays runnable under plain node/jest.
-
-export const COLORS = {
-  bg: '#1A1915',
-  terracotta: '#CC785C',
-  terracottaDark: '#A85B3F',
-  eye: '#1F1B16',
-  ivory: '#F0EEE6',
-  dim: '#8F887B',
-  bugGreen: '#7FBF6C',
-  bugDark: '#2E4E26',
-  errorRed: '#E5484D',
-  warnYellow: '#E9B44C',
-  playerBullet: '#F5D8C6',
-  enemyBullet: '#FF7B72',
-  powerDouble: '#7CC7FF',
-  powerRapid: '#FFD966',
-  powerLife: '#E5484D',
-  star: '#4A453D',
-  starBright: '#6B655B',
-  overlay: 'rgba(20, 18, 14, 0.82)',
-};
+// Gameplay tuning only. Colors live in src/theme/palettes.ts.
+// Pure TS (no react-native imports) so the game logic runs under plain node/jest.
 
 // Rendering scale: game-world pixels per sprite pixel.
 export const PIXEL = 3;
+export const BOSS_PIXEL = 5;
 
 // Player
 export const PLAYER_MAX_SPEED = 1500; // px/s chasing the drag target
 export const FIRE_INTERVAL = 0.32; // s between shots
 export const RAPID_FIRE_INTERVAL = 0.14;
-export const RAPID_DURATION = 8; // s
+export const RAPID_DURATION = 8; // s, from the in-game powerup drop
 export const BULLET_SPEED = 540;
 export const INVULN_TIME = 1.6; // s of blinking after a hit
 export const START_LIVES = 3;
@@ -51,6 +31,11 @@ export const POWERUP_FALL_SPEED = 130;
 export const DROP_LIFE_CHANCE = 0.015;
 export const DROP_RAPID_CHANCE = 0.05; // cumulative thresholds, see engine
 export const DROP_DOUBLE_CHANCE = 0.09;
+
+// Coins
+export const COIN_DROP_CHANCE = 0.2; // per scored kill
+export const COIN_FALL_SPEED = 150;
+export const COIN_SIZE = 18; // pickup hitbox (sprite is 6x6 at pixel 3)
 
 // Scoring
 export const SCORE_BUG = 10;

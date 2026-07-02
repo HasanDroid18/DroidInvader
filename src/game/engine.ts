@@ -1,4 +1,5 @@
 import * as C from '../constants';
+import { reviveCost, shieldDuration } from '../progression/boosters';
 import { SPIDER, spriteCols, spriteRows } from '../sprites';
 import { DEFAULT_SPIDER_COLOR, GAME_COLORS } from '../theme/palettes';
 import { bossParams, createBoss, stepBoss } from './boss';
@@ -43,6 +44,9 @@ export function createGameState(
     score: 0,
     lives: C.START_LIVES,
     runCoins: 0,
+    runGems: 0,
+    revivesUsed: 0,
+    shieldPickupDuration: shieldDuration(options.shieldLevel ?? 0),
     scoreMultTime: options.scoreMultDuration ?? 0,
     playerColor: options.spiderColorHex ?? DEFAULT_SPIDER_COLOR.hex,
     gameOver: false,
@@ -55,6 +59,7 @@ export function createGameState(
       invulnTime: 0,
       weapon: 'single',
       rapidTime: options.rapidDuration ?? 0,
+      shieldTime: 0,
     },
     enemies: wave.enemies,
     boss: null,
@@ -62,6 +67,7 @@ export function createGameState(
     enemyBullets: [],
     powerups: [],
     coinDrops: [],
+    gemDrops: [],
     particles: [],
     formationY: -220,
     diveTimer: 4,
@@ -78,6 +84,8 @@ function newEvents(): StepEvents {
     playerHit: false,
     powerup: false,
     coin: false,
+    gem: false,
+    shielded: false,
     waveCleared: false,
     bossDefeated: false,
     gameOver: false,
@@ -133,7 +141,12 @@ function loseLife(s: GameState, ev: StepEvents) {
 }
 
 function damagePlayer(s: GameState, ev: StepEvents) {
-  if (s.player.invulnTime > 0 || s.gameOver) return;
+  if (s.gameOver) return;
+  if (s.player.shieldTime > 0) {
+    ev.shielded = true;
+    return;
+  }
+  if (s.player.invulnTime > 0) return;
   loseLife(s, ev);
 }
 
@@ -144,6 +157,7 @@ function killEnemy(s: GameState, enemy: Enemy, ev: StepEvents, scored: boolean) 
     addScore(s, KILL_SCORE[enemy.kind] * mult);
     maybeDropPowerup(s, enemy);
     maybeDropCoin(s, enemy);
+    maybeDropGem(s, enemy);
   }
   spawnParticles(s, enemy.x + enemy.w / 2, enemy.y + enemy.h / 2, ENEMY_COLOR[enemy.kind], 9);
 }
@@ -161,12 +175,26 @@ function maybeDropCoin(s: GameState, enemy: Enemy) {
   });
 }
 
+function maybeDropGem(s: GameState, enemy: Enemy) {
+  if (Math.random() >= C.GEM_DROP_CHANCE) return;
+  s.gemDrops.push({
+    id: s.nextId++,
+    x: enemy.x + enemy.w / 2 - C.GEM_SIZE / 2,
+    y: enemy.y + enemy.h / 2,
+    w: C.GEM_SIZE,
+    h: C.GEM_SIZE,
+    vx: 0,
+    vy: C.GEM_FALL_SPEED,
+  });
+}
+
 function maybeDropPowerup(s: GameState, enemy: Enemy) {
   const r = Math.random();
   let kind: PowerupKind | null = null;
   if (r < C.DROP_LIFE_CHANCE) kind = 'life';
   else if (r < C.DROP_RAPID_CHANCE) kind = 'rapid';
   else if (r < C.DROP_DOUBLE_CHANCE) kind = 'double';
+  else if (r < C.DROP_SHIELD_CHANCE) kind = 'shield';
   if (!kind) return;
   s.powerups.push({
     id: s.nextId++,
@@ -185,6 +213,8 @@ function applyPowerup(s: GameState, p: Powerup) {
     else addScore(s, 50);
   } else if (p.kind === 'rapid') {
     s.player.rapidTime = Math.max(s.player.rapidTime, C.RAPID_DURATION);
+  } else if (p.kind === 'shield') {
+    s.player.shieldTime = Math.max(s.player.shieldTime, s.shieldPickupDuration);
   } else {
     if (s.player.weapon === 'double') addScore(s, 50);
     else s.player.weapon = 'double';
@@ -231,6 +261,8 @@ function defeatBoss(s: GameState, ev: StepEvents) {
   ev.enemyKilled = true;
   addScore(s, params.score);
   s.runCoins += params.coinReward;
+  s.runGems += params.gemReward;
+  ev.gem = true;
   spawnParticles(s, boss.x + boss.w / 2, boss.y + boss.h / 2, GAME_COLORS.boss, 30);
   // The escort dies with its boss (no score — the fight is already paid out).
   for (const e of s.enemies) {
@@ -239,6 +271,31 @@ function defeatBoss(s: GameState, ev: StepEvents) {
   s.enemies = [];
   s.enemyBullets = [];
   s.boss = null;
+}
+
+// Subway-Surfers-style revive, paid in gems by the UI layer (see reviveCost
+// in progression/boosters.ts — 1 gem, then 2, then 3, …). Restores lives,
+// clears every threat near the player, and grants a grace period.
+export function revive(s: GameState) {
+  s.gameOver = false;
+  s.lives = C.REVIVE_LIVES;
+  s.revivesUsed += 1;
+  s.player.invulnTime = C.REVIVE_INVULN;
+  s.enemyBullets = [];
+  // Blast a safety bubble: every non-boss enemy in the lower half explodes
+  // (no score — the revive is the reward).
+  for (let i = s.enemies.length - 1; i >= 0; i--) {
+    const e = s.enemies[i];
+    if (e.y + e.h > s.screenH * 0.5) {
+      spawnParticles(s, e.x + e.w / 2, e.y + e.h / 2, ENEMY_COLOR[e.kind], 9);
+      s.enemies.splice(i, 1);
+    }
+  }
+}
+
+// The gem price of this run's next revive.
+export function nextReviveCost(s: GameState): number {
+  return reviveCost(s.revivesUsed);
 }
 
 // Advance the whole game by dt seconds. Mutates state in place and returns
@@ -263,6 +320,7 @@ export function step(s: GameState, dt: number, input: StepInput): StepEvents {
 
   p.invulnTime = Math.max(0, p.invulnTime - dt);
   p.rapidTime = Math.max(0, p.rapidTime - dt);
+  p.shieldTime = Math.max(0, p.shieldTime - dt);
 
   // --- auto-fire
   p.fireCooldown -= dt;
@@ -433,19 +491,20 @@ export function step(s: GameState, dt: number, input: StepInput): StepEvents {
   // --- enemy bullets & enemy bodies vs player
   for (let i = s.enemyBullets.length - 1; i >= 0; i--) {
     if (intersects(s.enemyBullets[i], p)) {
-      s.enemyBullets.splice(i, 1);
+      s.enemyBullets.splice(i, 1); // absorbed by the shield or the hit
       damagePlayer(s, ev);
     }
   }
+  const canBeTouched = p.invulnTime <= 0 || p.shieldTime > 0;
   for (let i = s.enemies.length - 1; i >= 0; i--) {
     const e = s.enemies[i];
-    if (p.invulnTime <= 0 && !s.gameOver && intersects(e, p)) {
+    if (canBeTouched && !s.gameOver && intersects(e, p)) {
       s.enemies.splice(i, 1);
-      killEnemy(s, e, ev, false);
-      damagePlayer(s, ev);
+      killEnemy(s, e, ev, false); // ramming kills the enemy either way
+      damagePlayer(s, ev); // shield/invuln decide inside
     }
   }
-  if (s.boss && p.invulnTime <= 0 && !s.gameOver && intersects(s.boss, p)) {
+  if (s.boss && p.invulnTime <= 0 && p.shieldTime <= 0 && !s.gameOver && intersects(s.boss, p)) {
     damagePlayer(s, ev); // the boss itself shrugs off the collision
   }
 
@@ -473,6 +532,20 @@ export function step(s: GameState, dt: number, input: StepInput): StepEvents {
       s.coinDrops.splice(i, 1);
       s.runCoins += 1;
       ev.coin = true;
+    }
+  }
+
+  // --- gem pickups
+  for (let i = s.gemDrops.length - 1; i >= 0; i--) {
+    const g = s.gemDrops[i];
+    g.x += g.vx * dt;
+    g.y += g.vy * dt;
+    if (g.y > s.screenH + 20) {
+      s.gemDrops.splice(i, 1);
+    } else if (intersects(g, p)) {
+      s.gemDrops.splice(i, 1);
+      s.runGems += 1;
+      ev.gem = true;
     }
   }
 

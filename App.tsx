@@ -9,6 +9,7 @@ import {
   BOOSTERS,
   BoosterId,
   boosterDuration,
+  UpgradableId,
   upgradeCost,
 } from './src/progression/boosters';
 import { GameOverOverlay } from './src/screens/GameOverOverlay';
@@ -26,6 +27,7 @@ interface RunResult {
   score: number;
   wave: number;
   coins: number;
+  gems: number;
 }
 
 const NO_ARMED: Record<BoosterId, boolean> = { rapid: false, score2x: false };
@@ -36,7 +38,7 @@ export default function App() {
   const [gameId, setGameId] = useState(0);
   const [armed, setArmed] = useState<Record<BoosterId, boolean>>(NO_ARMED);
   const [runOptions, setRunOptions] = useState<RunOptions>({});
-  const [lastRun, setLastRun] = useState<RunResult>({ score: 0, wave: 1, coins: 0 });
+  const [lastRun, setLastRun] = useState<RunResult>({ score: 0, wave: 1, coins: 0, gems: 0 });
   const [isNewBest, setIsNewBest] = useState(false);
 
   useEffect(() => {
@@ -70,7 +72,7 @@ export default function App() {
   const toggleArm = (id: BoosterId) =>
     setArmed((a) => ({ ...a, [id]: !a[id] }));
 
-  const handleUpgrade = (id: BoosterId) => {
+  const handleUpgrade = (id: UpgradableId) => {
     if (!profile) return;
     const cost = upgradeCost(profile.boosterLevels[id]);
     if (cost == null || profile.coins < cost) return;
@@ -102,6 +104,7 @@ export default function App() {
       scoreMultDuration: active.score2x
         ? boosterDuration(profile.boosterLevels.score2x)
         : undefined,
+      shieldLevel: profile.boosterLevels.shield,
     });
     setGameId((id) => id + 1);
     setMode('playing');
@@ -113,6 +116,7 @@ export default function App() {
       updateProfile((p) => ({
         ...p,
         coins: p.coins + result.coins,
+        gems: p.gems + result.gems,
         highScore: Math.max(p.highScore, result.score),
       }));
       return newBest;
@@ -137,6 +141,14 @@ export default function App() {
     [bankRun]
   );
 
+  // Revives deduct from the wallet immediately, mid-run.
+  const handleSpendGems = useCallback(
+    (amount: number) => {
+      updateProfile((p) => ({ ...p, gems: Math.max(0, p.gems - amount) }));
+    },
+    [updateProfile]
+  );
+
   // --- settings -------------------------------------------------------------
 
   const handleSettingsChange = (patch: Partial<Settings>) => {
@@ -157,6 +169,8 @@ export default function App() {
           <GameScreen
             key={gameId}
             runOptions={runOptions}
+            gems={profile.gems}
+            onSpendGems={handleSpendGems}
             onGameOver={handleGameOver}
             onQuit={handleQuit}
           />
@@ -167,6 +181,7 @@ export default function App() {
               <MenuScreen
                 highScore={profile.highScore}
                 coins={profile.coins}
+                gems={profile.gems}
                 boosterLevels={profile.boosterLevels}
                 armed={armed}
                 canArm={canArm}
@@ -196,6 +211,7 @@ export default function App() {
                 score={lastRun.score}
                 wave={lastRun.wave}
                 coinsEarned={lastRun.coins}
+                gemsEarned={lastRun.gems}
                 highScore={profile.highScore}
                 isNewBest={isNewBest}
                 onRetry={startGame}

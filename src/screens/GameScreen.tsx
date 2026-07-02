@@ -12,8 +12,8 @@ import { sfx } from '../audio/sfx';
 import { PixelSprite } from '../components/PixelSprite';
 import { RetroButton } from '../components/RetroButton';
 import { Starfield } from '../components/Starfield';
-import { PIXEL, BOSS_PIXEL } from '../constants';
-import { createGameState, step } from '../game/engine';
+import { BOSS_PIXEL, PIXEL, REVIVE_COUNTDOWN } from '../constants';
+import { createGameState, nextReviveCost, revive, step } from '../game/engine';
 import { GameState, RunOptions, StepEvents, StepInput } from '../game/types';
 import { isBossWave } from '../game/waves';
 import {
@@ -21,10 +21,12 @@ import {
   BUG,
   COIN,
   ERROR_GLYPH,
+  GEM,
   PixelMap,
   POWERUP_DOUBLE,
   POWERUP_LIFE,
   POWERUP_RAPID,
+  POWERUP_SHIELD,
   WARN_GLYPH,
 } from '../sprites';
 import { GAME_COLORS } from '../theme/palettes';
@@ -40,41 +42,49 @@ const POWERUP_SPRITES = {
   double: POWERUP_DOUBLE,
   rapid: POWERUP_RAPID,
   life: POWERUP_LIFE,
+  shield: POWERUP_SHIELD,
 } as const;
 
-interface RunResult {
+export interface RunResult {
   score: number;
   wave: number;
   coins: number;
+  gems: number;
 }
 
 interface Props {
   runOptions: RunOptions;
+  gems: number; // wallet gems available for revives
+  onSpendGems: (amount: number) => void;
   onGameOver: (result: RunResult) => void;
   onQuit: (result: RunResult) => void;
+}
+
+function runResult(s: GameState): RunResult {
+  return { score: s.score, wave: s.wave, coins: s.runCoins, gems: s.runGems };
 }
 
 function playStepSfx(ev: StepEvents) {
   // Priority order: one haptic per frame, but sounds can overlap.
   if (ev.shot) sfx.play('shoot');
-  if (ev.hit) sfx.play('hit');
-  if (ev.coin) sfx.play('coin');
+  if (ev.hit || ev.shielded) sfx.play('hit');
+  if (ev.gem) sfx.play('gem');
+  else if (ev.coin) sfx.play('coin');
   if (ev.powerup) sfx.play('powerup');
-  if (ev.bossDefeated) sfx.play('explosion');
-  else if (ev.enemyKilled) sfx.play('explosion');
+  if (ev.bossDefeated || ev.enemyKilled) sfx.play('explosion');
   if (ev.playerHit) sfx.play('playerHit');
   if (ev.waveCleared) sfx.play('wave');
 
   if (ev.playerHit) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-  } else if (ev.powerup || ev.coin) {
+  } else if (ev.powerup || ev.coin || ev.gem) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   } else if (ev.enemyKilled) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
   }
 }
 
-export function GameScreen({ runOptions, onGameOver, onQuit }: Props) {
+export function GameScreen({ runOptions, gems, onSpendGems, onGameOver, onQuit }: Props) {
   const { width, height } = useWindowDimensions();
   const { palette, spiderMap, spiderHex } = useTheme();
 
@@ -85,17 +95,75 @@ export function GameScreen({ runOptions, onGameOver, onQuit }: Props) {
 
   const [, forceRender] = useReducer((c: number) => c + 1, 0);
   const [paused, setPaused] = useState(false);
+  // >0 while the revive offer is on screen; the sim is frozen meanwhile.
+  const [reviveCost, setReviveCost] = useState<number | null>(null);
+  const [reviveLeft, setReviveLeft] = useState(REVIVE_COUNTDOWN);
+
   const pausedRef = useRef(false);
+  const reviveRef = useRef(false);
+  const endedRef = useRef(false);
   const inputRef = useRef<StepInput>({ targetX: null, targetY: null });
   const dragStart = useRef({ playerX: 0, playerY: 0, touchX: 0, touchY: 0 });
-  const callbacksRef = useRef({ onGameOver, onQuit });
-  callbacksRef.current = { onGameOver, onQuit };
+  const gemsRef = useRef(gems);
+  gemsRef.current = gems;
+  const callbacksRef = useRef({ onGameOver, onQuit, onSpendGems });
+  callbacksRef.current = { onGameOver, onQuit, onSpendGems };
   const bossAnnouncedRef = useRef(false);
 
   const setPausedBoth = (v: boolean) => {
     pausedRef.current = v;
     setPaused(v);
   };
+
+  const finishGameOver = () => {
+    if (endedRef.current) return;
+    endedRef.current = true;
+    const s = stateRef.current!;
+    sfx.play('gameOver');
+    forceRender(); // let the final explosion show
+    setTimeout(() => callbacksRef.current.onGameOver(runResult(s)), 650);
+  };
+
+  const offerRevive = () => {
+    reviveRef.current = true;
+    setReviveCost(nextReviveCost(stateRef.current!));
+    setReviveLeft(REVIVE_COUNTDOWN);
+  };
+
+  const acceptRevive = () => {
+    const s = stateRef.current!;
+    const cost = nextReviveCost(s);
+    if (gemsRef.current < cost) return;
+    callbacksRef.current.onSpendGems(cost);
+    revive(s);
+    sfx.play('revive');
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    reviveRef.current = false;
+    setReviveCost(null);
+  };
+
+  const declineRevive = () => {
+    reviveRef.current = false;
+    setReviveCost(null);
+    finishGameOver();
+  };
+
+  // Revive countdown (sim is frozen while the offer is up).
+  useEffect(() => {
+    if (reviveCost == null) return;
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      const left = REVIVE_COUNTDOWN - (Date.now() - startedAt) / 1000;
+      if (left <= 0) {
+        clearInterval(timer);
+        declineRevive();
+      } else {
+        setReviveLeft(left);
+      }
+    }, 100);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviveCost]);
 
   // Relative dragging: the spider follows finger *movement*, so the finger
   // never has to sit on top of the sprite.
@@ -142,7 +210,7 @@ export function GameScreen({ runOptions, onGameOver, onQuit }: Props) {
       }
       const dt = Math.min((t - last) / 1000, 1 / 30);
       last = t;
-      if (pausedRef.current) return;
+      if (pausedRef.current || reviveRef.current || endedRef.current) return;
 
       const s = stateRef.current!;
       const ev = step(s, dt, inputRef.current);
@@ -158,15 +226,13 @@ export function GameScreen({ runOptions, onGameOver, onQuit }: Props) {
       }
 
       if (ev.gameOver) {
-        alive = false;
-        cancelAnimationFrame(raf);
-        sfx.play('gameOver');
-        // Let the final explosion render once before switching screens.
-        forceRender();
-        setTimeout(
-          () => callbacksRef.current.onGameOver({ score: s.score, wave: s.wave, coins: s.runCoins }),
-          650
-        );
+        // Subway-style second chance: offer a gem revive if affordable.
+        if (gemsRef.current >= nextReviveCost(s)) {
+          forceRender();
+          offerRevive();
+        } else {
+          finishGameOver();
+        }
         return;
       }
       forceRender();
@@ -177,11 +243,14 @@ export function GameScreen({ runOptions, onGameOver, onQuit }: Props) {
       alive = false;
       cancelAnimationFrame(raf);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const s = stateRef.current;
   const blinking = s.player.invulnTime > 0 && Math.floor(s.time * 12) % 2 === 0;
   const bossWave = isBossWave(s.wave);
+  const shieldOn = s.player.shieldTime > 0;
+  const shieldBlinking = shieldOn && s.player.shieldTime < 1.2 && Math.floor(s.time * 8) % 2 === 0;
 
   return (
     <View style={[styles.container, { backgroundColor: palette.bg }]} {...pan.panHandlers}>
@@ -214,7 +283,11 @@ export function GameScreen({ runOptions, onGameOver, onQuit }: Props) {
           <PixelSprite
             map={BOSS}
             pixel={BOSS_PIXEL}
-            style={s.boss.flashTime > 0 ? styles.hitFlash : undefined}
+            style={
+              s.boss.flashTime > 0 || s.boss.state === 'telegraph'
+                ? styles.hitFlash
+                : undefined
+            }
           />
         </View>
       )}
@@ -258,7 +331,7 @@ export function GameScreen({ runOptions, onGameOver, onQuit }: Props) {
         />
       ))}
 
-      {/* coins & powerups */}
+      {/* pickups: coins, gems, powerups */}
       {s.coinDrops.map((c) => (
         <View
           key={c.id}
@@ -266,6 +339,15 @@ export function GameScreen({ runOptions, onGameOver, onQuit }: Props) {
           style={[styles.entity, { transform: [{ translateX: c.x }, { translateY: c.y }] }]}
         >
           <PixelSprite map={COIN} pixel={3} />
+        </View>
+      ))}
+      {s.gemDrops.map((g) => (
+        <View
+          key={g.id}
+          pointerEvents="none"
+          style={[styles.entity, { transform: [{ translateX: g.x }, { translateY: g.y }] }]}
+        >
+          <PixelSprite map={GEM} pixel={3} />
         </View>
       ))}
       {s.powerups.map((pu) => (
@@ -278,33 +360,54 @@ export function GameScreen({ runOptions, onGameOver, onQuit }: Props) {
         </View>
       ))}
 
-      {/* player */}
+      {/* player (+ shield ring) */}
       {!s.gameOver && (
-        <View
-          pointerEvents="none"
-          style={[
-            styles.entity,
-            {
-              opacity: blinking ? 0.25 : 1,
-              transform: [{ translateX: s.player.x }, { translateY: s.player.y }],
-            },
-          ]}
-        >
-          <PixelSprite map={spiderMap} pixel={PIXEL} />
-        </View>
+        <>
+          {shieldOn && !shieldBlinking && (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.shieldRing,
+                {
+                  width: s.player.w + 16,
+                  height: s.player.h + 16,
+                  transform: [
+                    { translateX: s.player.x - 8 },
+                    { translateY: s.player.y - 8 },
+                  ],
+                },
+              ]}
+            />
+          )}
+          <View
+            pointerEvents="none"
+            style={[
+              styles.entity,
+              {
+                opacity: blinking ? 0.25 : 1,
+                transform: [{ translateX: s.player.x }, { translateY: s.player.y }],
+              },
+            ]}
+          >
+            <PixelSprite map={spiderMap} pixel={PIXEL} />
+          </View>
+        </>
       )}
 
       {/* boss health bar */}
       {s.boss && (
         <View style={styles.bossBarWrap} pointerEvents="none">
           <Text style={[styles.bossBarLabel, { color: GAME_COLORS.boss }]}>
-            BOSS · TIER {s.boss.tier}
+            {s.boss.enraged ? '⚡ ENRAGED ⚡ · ' : ''}BOSS · TIER {s.boss.tier}
           </Text>
           <View style={[styles.bossBarTrack, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
             <View
               style={[
                 styles.bossBarFill,
-                { backgroundColor: GAME_COLORS.boss, width: `${Math.max((s.boss.hp / s.boss.maxHp) * 100, 0)}%` },
+                {
+                  backgroundColor: s.boss.enraged ? GAME_COLORS.errorRed : GAME_COLORS.boss,
+                  width: `${Math.max((s.boss.hp / s.boss.maxHp) * 100, 0)}%`,
+                },
               ]}
             />
           </View>
@@ -327,6 +430,9 @@ export function GameScreen({ runOptions, onGameOver, onQuit }: Props) {
           <View style={styles.hudCoins}>
             <PixelSprite map={COIN} pixel={2} />
             <Text style={[styles.hudCoinText, { color: palette.text }]}>{s.runCoins}</Text>
+            <View style={styles.hudGemGap} />
+            <PixelSprite map={GEM} pixel={2} />
+            <Text style={[styles.hudCoinText, { color: palette.text }]}>{s.runGems}</Text>
           </View>
         </View>
         <Pressable onPress={() => setPausedBoth(true)} style={styles.pauseButton} hitSlop={12}>
@@ -335,7 +441,7 @@ export function GameScreen({ runOptions, onGameOver, onQuit }: Props) {
       </View>
 
       {/* status pills */}
-      {(s.player.rapidTime > 0 || s.player.weapon === 'double' || s.scoreMultTime > 0) && (
+      {(s.player.rapidTime > 0 || s.player.weapon === 'double' || s.scoreMultTime > 0 || shieldOn) && (
         <View style={styles.pillRow} pointerEvents="none">
           {s.player.weapon === 'double' && (
             <Text style={[styles.pill, { color: GAME_COLORS.powerDouble, borderColor: GAME_COLORS.powerDouble }]}>
@@ -345,6 +451,11 @@ export function GameScreen({ runOptions, onGameOver, onQuit }: Props) {
           {s.player.rapidTime > 0 && (
             <Text style={[styles.pill, { color: GAME_COLORS.powerRapid, borderColor: GAME_COLORS.powerRapid }]}>
               RAPID {Math.ceil(s.player.rapidTime)}
+            </Text>
+          )}
+          {shieldOn && (
+            <Text style={[styles.pill, { color: GAME_COLORS.shield, borderColor: GAME_COLORS.shield }]}>
+              SHIELD {Math.ceil(s.player.shieldTime)}
             </Text>
           )}
           {s.scoreMultTime > 0 && (
@@ -359,8 +470,30 @@ export function GameScreen({ runOptions, onGameOver, onQuit }: Props) {
       {s.waveBannerTime > 0 && (
         <View style={styles.bannerWrap} pointerEvents="none">
           <Text style={[styles.banner, { color: bossWave ? GAME_COLORS.boss : palette.accent }]}>
-            {bossWave ? `⚠ BOSS ${s.wave / 10} ⚠` : `WAVE ${s.wave}`}
+            {bossWave ? `⚠ BOSS ${s.wave / 10} ⚠` : s.enemies[0]?.mode === 'creep' ? 'SWARM!' : `WAVE ${s.wave}`}
           </Text>
+        </View>
+      )}
+
+      {/* revive offer */}
+      {reviveCost != null && (
+        <View style={[styles.pauseOverlay, { backgroundColor: palette.overlay }]}>
+          <Text style={[styles.reviveTitle, { color: palette.text }]}>CONTINUE?</Text>
+          <View style={styles.reviveGemRow}>
+            <PixelSprite map={GEM} pixel={5} />
+            <Text style={[styles.reviveCost, { color: GAME_COLORS.gem }]}>{reviveCost}</Text>
+          </View>
+          <View style={[styles.reviveBarTrack, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
+            <View
+              style={[
+                styles.reviveBarFill,
+                { backgroundColor: GAME_COLORS.gem, width: `${(reviveLeft / REVIVE_COUNTDOWN) * 100}%` },
+              ]}
+            />
+          </View>
+          <RetroButton label={`REVIVE · ${reviveCost} GEM${reviveCost > 1 ? 'S' : ''}`} onPress={acceptRevive} style={styles.resume} />
+          <RetroButton label="GIVE UP" variant="ghost" size="small" onPress={declineRevive} />
+          <Text style={[styles.reviveWallet, { color: palette.textDim }]}>WALLET: {gems} GEMS</Text>
         </View>
       )}
 
@@ -373,9 +506,7 @@ export function GameScreen({ runOptions, onGameOver, onQuit }: Props) {
             label="QUIT TO MENU"
             variant="ghost"
             size="small"
-            onPress={() =>
-              callbacksRef.current.onQuit({ score: s.score, wave: s.wave, coins: s.runCoins })
-            }
+            onPress={() => callbacksRef.current.onQuit(runResult(s))}
           />
         </View>
       )}
@@ -401,6 +532,14 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     borderRadius: 2,
+  },
+  shieldRing: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    borderWidth: 2,
+    borderColor: GAME_COLORS.shield,
+    borderRadius: 12,
   },
   bossBarWrap: {
     position: 'absolute',
@@ -465,6 +604,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 5,
   },
+  hudGemGap: {
+    width: 12,
+  },
   livesRow: {
     flexDirection: 'row',
     marginTop: 6,
@@ -484,6 +626,7 @@ const styles = StyleSheet.create({
     top: 124,
     left: 18,
     flexDirection: 'row',
+    flexWrap: 'wrap',
   },
   pill: {
     fontFamily: FONT,
@@ -494,6 +637,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     marginRight: 8,
+    marginBottom: 6,
     overflow: 'hidden',
   },
   bannerWrap: {
@@ -529,6 +673,41 @@ const styles = StyleSheet.create({
   },
   resume: {
     marginBottom: 18,
-    minWidth: 200,
+    minWidth: 220,
+  },
+  reviveTitle: {
+    fontFamily: FONT,
+    fontSize: 32,
+    letterSpacing: 8,
+    fontWeight: 'bold',
+    marginBottom: 18,
+  },
+  reviveGemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  reviveCost: {
+    fontFamily: FONT,
+    fontSize: 34,
+    fontWeight: 'bold',
+    marginLeft: 12,
+  },
+  reviveBarTrack: {
+    height: 10,
+    borderWidth: 1,
+    borderRadius: 5,
+    width: 240,
+    overflow: 'hidden',
+    marginBottom: 26,
+  },
+  reviveBarFill: {
+    height: '100%',
+  },
+  reviveWallet: {
+    fontFamily: FONT,
+    fontSize: 11,
+    letterSpacing: 2,
+    marginTop: 18,
   },
 });

@@ -5,6 +5,9 @@
 // raises the effect duration: 10s at Lv1 up to 60s at Lv10.
 
 export type BoosterId = 'rapid' | 'score2x';
+// Everything with a shop level, including the shield (not armable — it is an
+// in-game drop that always works; the shop only upgrades its duration).
+export type UpgradableId = BoosterId | 'shield';
 
 export interface BoosterDef {
   id: BoosterId;
@@ -45,4 +48,23 @@ export function boosterDuration(level: number): number {
 export function upgradeCost(currentLevel: number): number | null {
   if (currentLevel >= MAX_BOOSTER_LEVEL) return null;
   return 75 * (currentLevel + 1);
+}
+
+// --- shield ---------------------------------------------------------------
+// The shield drop needs no unlock: level 0 already grants 5s of immunity.
+// Shop levels only extend it, up to 10s at level 10.
+
+export const SHIELD_BASE_DURATION = 5;
+export const SHIELD_PER_LEVEL = 0.5;
+
+export function shieldDuration(level: number): number {
+  const l = Math.min(Math.max(level, 0), MAX_BOOSTER_LEVEL);
+  return SHIELD_BASE_DURATION + l * SHIELD_PER_LEVEL;
+}
+
+// --- revives (Subway-Surfers style) ----------------------------------------
+// Paid in gems; the price climbs with every revive used in the same run.
+
+export function reviveCost(revivesUsed: number): number {
+  return revivesUsed + 1; // 1, 2, 3, 4, ...
 }

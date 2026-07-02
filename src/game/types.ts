@@ -25,12 +25,20 @@ export interface Enemy extends Rect {
   flashTime: number; // hit-flash countdown
 }
 
+export type BossKind = 'spreader' | 'rain' | 'charger';
+// Charger boss state machine: hover -> telegraph -> charge -> recover.
+export type BossState = 'hover' | 'telegraph' | 'charge' | 'recover';
+
 export interface Boss extends Rect {
+  kind: BossKind;
   hp: number;
   maxHp: number;
   tier: number; // wave / 10
   dir: 1 | -1; // horizontal sweep direction
   phase: number; // for the vertical bob
+  state: BossState; // used by the charger archetype
+  stateTime: number;
+  enraged: boolean; // below half HP: faster, angrier
   fireCooldown: number;
   spawnCooldown: number;
   flashTime: number;
@@ -42,7 +50,7 @@ export interface Bullet extends Rect {
   vy: number;
 }
 
-export type PowerupKind = 'double' | 'rapid' | 'life';
+export type PowerupKind = 'double' | 'rapid' | 'life' | 'shield';
 
 export interface Powerup extends Rect {
   id: number;
@@ -51,6 +59,12 @@ export interface Powerup extends Rect {
 }
 
 export interface CoinDrop extends Rect {
+  id: number;
+  vx: number;
+  vy: number;
+}
+
+export interface GemDrop extends Rect {
   id: number;
   vx: number;
   vy: number;
@@ -73,6 +87,7 @@ export interface Player extends Rect {
   invulnTime: number;
   weapon: 'single' | 'double';
   rapidTime: number;
+  shieldTime: number; // full immunity while > 0 (absorbs bullets)
 }
 
 export interface GameState {
@@ -83,6 +98,9 @@ export interface GameState {
   score: number;
   lives: number;
   runCoins: number; // coins collected this run, banked on game over / quit
+  runGems: number; // gems collected this run (rare), banked the same way
+  revivesUsed: number; // escalates the gem price of the next revive
+  shieldPickupDuration: number; // s granted by shield pickups (shop level)
   scoreMultTime: number; // >0 while the x2 score booster is active
   playerColor: string; // hex, for hit particles
   gameOver: boolean;
@@ -93,6 +111,7 @@ export interface GameState {
   enemyBullets: Bullet[];
   powerups: Powerup[];
   coinDrops: CoinDrop[];
+  gemDrops: GemDrop[];
   particles: Particle[];
   formationY: number; // y of the formation's top row
   diveTimer: number;
@@ -109,6 +128,7 @@ export interface StepInput {
 export interface RunOptions {
   rapidDuration?: number; // s of rapid fire from the armed booster
   scoreMultDuration?: number; // s of x2 score from the armed booster
+  shieldLevel?: number; // shop level; sets the duration of shield pickups
   spiderColorHex?: string;
 }
 
@@ -120,6 +140,8 @@ export interface StepEvents {
   playerHit: boolean;
   powerup: boolean;
   coin: boolean;
+  gem: boolean;
+  shielded: boolean; // the shield absorbed damage this step
   waveCleared: boolean;
   bossDefeated: boolean;
   gameOver: boolean;

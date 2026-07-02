@@ -128,3 +128,18 @@ writeWav(
   )
 );
 writeWav('click', square(1200, 1000, 0.04, 0.3, 8));
+writeWav(
+  'gem',
+  concat(
+    triangle(1319, 1319, 0.05, 0.45, 2),
+    triangle(1760, 1760, 0.05, 0.45, 2),
+    triangle(2093, 2093, 0.16, 0.45, 5)
+  )
+);
+writeWav(
+  'revive',
+  mix(
+    concat(square(262, 262, 0.12, 0.35, 1.5), square(330, 330, 0.12, 0.35, 1.5), square(392, 392, 0.12, 0.35, 1.5), square(523, 523, 0.3, 0.35, 3)),
+    concat(silence(0.06), triangle(523, 1047, 0.55, 0.3, 2))
+  )
+);

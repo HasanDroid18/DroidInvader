@@ -108,6 +108,30 @@ export const COIN: PixelMap = {
   palette: { C: GAME_COLORS.coin, d: GAME_COLORS.coinDark },
 };
 
+export const GEM: PixelMap = {
+  rows: [
+    '.GGGG.',
+    'GSGGGG',
+    'GGGGGG',
+    '.GGGG.',
+    '..GG..',
+    '...G..',
+  ],
+  palette: { G: GAME_COLORS.gem, S: GAME_COLORS.gemShine },
+};
+
+export const POWERUP_SHIELD: PixelMap = {
+  rows: [
+    '.SSSS.',
+    'SS..SS',
+    'S....S',
+    'S....S',
+    'SS..SS',
+    '.SSSS.',
+  ],
+  palette: { S: GAME_COLORS.shield },
+};
+
 export const POWERUP_DOUBLE: PixelMap = {
   rows: ['.C...C.', '.C...C.', '.C...C.', '.C...C.', '.C...C.'],
   palette: { C: GAME_COLORS.powerDouble },

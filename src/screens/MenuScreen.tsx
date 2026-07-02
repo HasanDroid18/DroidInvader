@@ -9,12 +9,13 @@ import {
   BoosterId,
   boosterDuration,
 } from '../progression/boosters';
-import { COIN } from '../sprites';
+import { COIN, GEM } from '../sprites';
 import { FONT, useTheme } from '../theme/ThemeContext';
 
 interface Props {
   highScore: number;
   coins: number;
+  gems: number;
   boosterLevels: Record<BoosterId, number>;
   armed: Record<BoosterId, boolean>;
   canArm: (id: BoosterId) => boolean;
@@ -27,6 +28,7 @@ interface Props {
 export function MenuScreen({
   highScore,
   coins,
+  gems,
   boosterLevels,
   armed,
   canArm,
@@ -56,6 +58,9 @@ export function MenuScreen({
       <View style={styles.walletRow}>
         <PixelSprite map={COIN} pixel={3} />
         <Text style={[styles.walletText, { color: palette.text }]}>{coins}</Text>
+        <View style={styles.walletGap} />
+        <PixelSprite map={GEM} pixel={3} />
+        <Text style={[styles.walletText, { color: palette.text }]}>{gems}</Text>
       </View>
 
       <Text style={[styles.title, { color: palette.accent }]}>CLAUDE</Text>
@@ -132,6 +137,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 7,
+  },
+  walletGap: {
+    width: 14,
   },
   title: {
     fontFamily: FONT,

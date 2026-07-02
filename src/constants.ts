@@ -31,11 +31,22 @@ export const POWERUP_FALL_SPEED = 130;
 export const DROP_LIFE_CHANCE = 0.015;
 export const DROP_RAPID_CHANCE = 0.05; // cumulative thresholds, see engine
 export const DROP_DOUBLE_CHANCE = 0.09;
+export const DROP_SHIELD_CHANCE = 0.13;
 
 // Coins
 export const COIN_DROP_CHANCE = 0.2; // per scored kill
 export const COIN_FALL_SPEED = 150;
 export const COIN_SIZE = 18; // pickup hitbox (sprite is 6x6 at pixel 3)
+
+// Gems (rare premium currency; bosses are the reliable source)
+export const GEM_DROP_CHANCE = 0.003; // per scored kill
+export const GEM_FALL_SPEED = 120;
+export const GEM_SIZE = 18;
+
+// Revive
+export const REVIVE_LIVES = 3; // lives restored by a revive
+export const REVIVE_INVULN = 3; // s of protection after reviving
+export const REVIVE_COUNTDOWN = 5; // s the revive offer stays on screen
 
 // Scoring
 export const SCORE_BUG = 10;

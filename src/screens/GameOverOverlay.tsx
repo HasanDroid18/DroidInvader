@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { PixelSprite } from '../components/PixelSprite';
 import { RetroButton } from '../components/RetroButton';
-import { COIN } from '../sprites';
+import { COIN, GEM } from '../sprites';
 import { GAME_COLORS } from '../theme/palettes';
 import { FONT, useTheme } from '../theme/ThemeContext';
 
@@ -10,6 +10,7 @@ interface Props {
   score: number;
   wave: number;
   coinsEarned: number;
+  gemsEarned: number;
   highScore: number;
   isNewBest: boolean;
   onRetry: () => void;
@@ -20,6 +21,7 @@ export function GameOverOverlay({
   score,
   wave,
   coinsEarned,
+  gemsEarned,
   highScore,
   isNewBest,
   onRetry,
@@ -40,6 +42,13 @@ export function GameOverOverlay({
       <View style={styles.coinsRow}>
         <PixelSprite map={COIN} pixel={3} />
         <Text style={[styles.coinsText, { color: palette.text }]}>+{coinsEarned}</Text>
+        {gemsEarned > 0 && (
+          <>
+            <View style={styles.earnGap} />
+            <PixelSprite map={GEM} pixel={3} />
+            <Text style={[styles.coinsText, { color: palette.text }]}>+{gemsEarned}</Text>
+          </>
+        )}
       </View>
       <RetroButton label="PLAY AGAIN" onPress={onRetry} style={styles.retry} />
       <RetroButton label="MENU" onPress={onMenu} variant="ghost" size="small" style={styles.menu} />
@@ -96,6 +105,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginLeft: 8,
+  },
+  earnGap: {
+    width: 16,
   },
   retry: {
     marginBottom: 14,

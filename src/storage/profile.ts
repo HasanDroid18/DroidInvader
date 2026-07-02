@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BoosterId, MAX_BOOSTER_LEVEL } from '../progression/boosters';
+import { MAX_BOOSTER_LEVEL, UpgradableId } from '../progression/boosters';
 import { SPIDER_COLORS, ThemeName } from '../theme/palettes';
 
 // Single persisted blob for everything the game remembers between launches.
@@ -14,18 +14,22 @@ export interface Profile {
   version: 1;
   highScore: number;
   coins: number;
-  boosterLevels: Record<BoosterId, number>; // 0 = not owned
+  gems: number; // premium revive currency; every new install starts with 50
+  boosterLevels: Record<UpgradableId, number>; // 0 = not owned (shield: base level)
   settings: Settings;
 }
 
 const PROFILE_KEY = 'claude-invader/profile-v1';
 const LEGACY_HIGHSCORE_KEY = 'claude-invader/high-score';
 
+export const STARTING_GEMS = 50; // the free welcome gift
+
 export const DEFAULT_PROFILE: Profile = {
   version: 1,
   highScore: 0,
   coins: 0,
-  boosterLevels: { rapid: 0, score2x: 0 },
+  gems: STARTING_GEMS,
+  boosterLevels: { rapid: 0, score2x: 0, shield: 0 },
   settings: { soundOn: true, theme: 'dark', spiderColor: 'terracotta' },
 };
 
@@ -45,9 +49,13 @@ export function normalizeProfile(raw: unknown): Profile {
     version: 1,
     highScore: clampInt(r.highScore, 0, Number.MAX_SAFE_INTEGER, 0),
     coins: clampInt(r.coins, 0, Number.MAX_SAFE_INTEGER, 0),
+    // Missing gems field (fresh install or pre-gems profile) → welcome gift.
+    // An explicitly saved 0 stays 0.
+    gems: clampInt(r.gems, 0, Number.MAX_SAFE_INTEGER, STARTING_GEMS),
     boosterLevels: {
       rapid: clampInt(levels.rapid, 0, MAX_BOOSTER_LEVEL, 0),
       score2x: clampInt(levels.score2x, 0, MAX_BOOSTER_LEVEL, 0),
+      shield: clampInt(levels.shield, 0, MAX_BOOSTER_LEVEL, 0),
     },
     settings: {
       soundOn: typeof settings.soundOn === 'boolean' ? settings.soundOn : true,

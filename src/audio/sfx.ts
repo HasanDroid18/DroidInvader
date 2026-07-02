@@ -15,6 +15,8 @@ const SOURCES = {
   boss: require('../../assets/sfx/boss.wav'),
   gameOver: require('../../assets/sfx/gameOver.wav'),
   click: require('../../assets/sfx/click.wav'),
+  gem: require('../../assets/sfx/gem.wav'),
+  revive: require('../../assets/sfx/revive.wav'),
 } as const;
 
 export type SfxName = keyof typeof SOURCES;

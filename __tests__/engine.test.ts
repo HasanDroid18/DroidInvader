@@ -1,6 +1,13 @@
-import { FORMATION_TOP, SCORE_BUG, START_LIVES, WAVE_BONUS_BASE, WAVE_BONUS_PER_WAVE } from '../src/constants';
+import {
+  FORMATION_TOP,
+  REVIVE_LIVES,
+  SCORE_BUG,
+  START_LIVES,
+  WAVE_BONUS_BASE,
+  WAVE_BONUS_PER_WAVE,
+} from '../src/constants';
 import { bossParams, createBoss } from '../src/game/boss';
-import { createGameState, step } from '../src/game/engine';
+import { createGameState, nextReviveCost, revive, step } from '../src/game/engine';
 import { GameState } from '../src/game/types';
 
 const NO_INPUT = { targetX: null, targetY: null };
@@ -186,6 +193,88 @@ describe('step', () => {
     const plain = createGameState(400, 800);
     expect(plain.player.rapidTime).toBe(0);
     expect(plain.scoreMultTime).toBe(0);
+  });
+
+  it('boss defeat also grants gems', () => {
+    const s = settledState();
+    s.wave = 10;
+    s.enemies = [];
+    s.boss = createBoss(1, s.screenW);
+    s.boss.y = 100;
+    s.boss.hp = 1;
+    s.waveBannerTime = 0;
+    s.playerBullets.push({
+      id: 9101,
+      x: s.boss.x + s.boss.w / 2,
+      y: s.boss.y + s.boss.h / 2,
+      w: 4,
+      h: 10,
+      vx: 0,
+      vy: -540,
+    });
+    const ev = step(s, 0.001, NO_INPUT);
+    expect(ev.gem).toBe(true);
+    expect(s.runGems).toBe(bossParams(1).gemReward);
+  });
+
+  it('collecting a gem drop increments run gems', () => {
+    const s = settledState();
+    const p = s.player;
+    s.gemDrops.push({ id: 9201, x: p.x + p.w / 2, y: p.y + p.h / 2, w: 18, h: 18, vx: 0, vy: 120 });
+    const ev = step(s, 0.001, NO_INPUT);
+    expect(ev.gem).toBe(true);
+    expect(s.runGems).toBe(1);
+    expect(s.gemDrops).toHaveLength(0);
+  });
+
+  it('an active shield absorbs hits without losing a life', () => {
+    const s = settledState();
+    const p = s.player;
+    p.shieldTime = 5;
+    s.enemyBullets.push({ id: 9400, x: p.x + p.w / 2, y: p.y + p.h / 2, w: 4, h: 10, vx: 0, vy: 200 });
+    const ev = step(s, 0.001, NO_INPUT);
+    expect(ev.shielded).toBe(true);
+    expect(ev.playerHit).toBe(false);
+    expect(s.lives).toBe(START_LIVES);
+    expect(s.enemyBullets).toHaveLength(0); // the bullet was absorbed
+  });
+
+  it('shield pickups use the shop-upgraded duration', () => {
+    const s = createGameState(400, 800, { shieldLevel: 10 });
+    expect(s.shieldPickupDuration).toBe(10);
+    const p = s.player;
+    s.powerups.push({ id: 9401, kind: 'shield', x: p.x + p.w / 2 - 10, y: p.y + p.h / 2, w: 20, h: 18, vy: 130 });
+    s.waveBannerTime = 0;
+    s.formationY = FORMATION_TOP;
+    step(s, 0.001, NO_INPUT);
+    expect(s.player.shieldTime).toBeCloseTo(10, 1);
+  });
+
+  it('revive works like Subway keys: escalating cost, fresh lives, cleared threats', () => {
+    const s = settledState();
+    expect(nextReviveCost(s)).toBe(1);
+
+    // Die.
+    s.lives = 1;
+    const p = s.player;
+    s.enemyBullets.push({ id: 9500, x: p.x + p.w / 2, y: p.y + p.h / 2, w: 4, h: 10, vx: 0, vy: 200 });
+    const ev = step(s, 0.001, NO_INPUT);
+    expect(ev.gameOver).toBe(true);
+
+    // Revive: run continues with a safety bubble.
+    revive(s);
+    expect(s.gameOver).toBe(false);
+    expect(s.lives).toBe(REVIVE_LIVES);
+    expect(s.player.invulnTime).toBeGreaterThan(0);
+    expect(s.enemyBullets).toHaveLength(0);
+    expect(s.revivesUsed).toBe(1);
+    expect(nextReviveCost(s)).toBe(2); // next one is pricier
+
+    // The sim keeps stepping normally afterwards.
+    const wave = s.wave;
+    step(s, 0.016, NO_INPUT);
+    expect(s.gameOver).toBe(false);
+    expect(s.wave).toBeGreaterThanOrEqual(wave);
   });
 
   it('clamps the player inside the screen', () => {

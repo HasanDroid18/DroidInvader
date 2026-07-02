@@ -3,6 +3,8 @@ import {
   BOOSTERS,
   boosterDuration,
   MAX_BOOSTER_LEVEL,
+  reviveCost,
+  shieldDuration,
   upgradeCost,
 } from '../src/progression/boosters';
 
@@ -44,5 +46,26 @@ describe('booster definitions', () => {
     for (const id of BOOSTER_IDS) {
       expect(BOOSTERS[id].armCost).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('shieldDuration', () => {
+  it('works at level 0 without an unlock (5s base)', () => {
+    expect(shieldDuration(0)).toBe(5);
+  });
+
+  it('adds half a second per level up to 10s', () => {
+    expect(shieldDuration(1)).toBe(5.5);
+    expect(shieldDuration(MAX_BOOSTER_LEVEL)).toBe(10);
+    expect(shieldDuration(99)).toBe(10);
+  });
+});
+
+describe('reviveCost', () => {
+  it('escalates like Subway keys: 1, 2, 3, ...', () => {
+    expect(reviveCost(0)).toBe(1);
+    expect(reviveCost(1)).toBe(2);
+    expect(reviveCost(2)).toBe(3);
+    expect(reviveCost(9)).toBe(10);
   });
 });

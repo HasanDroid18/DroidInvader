@@ -1,13 +1,14 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PixelSprite } from '../components/PixelSprite';
 import { RetroButton } from '../components/RetroButton';
 import {
   BOOSTER_IDS,
   BOOSTERS,
-  BoosterId,
   boosterDuration,
   MAX_BOOSTER_LEVEL,
+  shieldDuration,
+  UpgradableId,
   upgradeCost,
 } from '../progression/boosters';
 import { COIN } from '../sprites';
@@ -15,57 +16,95 @@ import { FONT, useTheme } from '../theme/ThemeContext';
 
 interface Props {
   coins: number;
-  boosterLevels: Record<BoosterId, number>;
-  onUpgrade: (id: BoosterId) => void;
+  boosterLevels: Record<UpgradableId, number>;
+  onUpgrade: (id: UpgradableId) => void;
   onBack: () => void;
+}
+
+interface CardModel {
+  id: UpgradableId;
+  name: string;
+  lines: string[];
+  level: number;
+  buyLabel: (cost: number) => string;
 }
 
 export function ShopScreen({ coins, boosterLevels, onUpgrade, onBack }: Props) {
   const { palette } = useTheme();
 
+  const cards: CardModel[] = [
+    ...BOOSTER_IDS.map((id): CardModel => {
+      const def = BOOSTERS[id];
+      const level = boosterLevels[id];
+      const maxed = level >= MAX_BOOSTER_LEVEL;
+      return {
+        id,
+        name: def.name,
+        level,
+        lines: [
+          def.description,
+          level === 0
+            ? `UNLOCK: ${boosterDuration(1)}s AT START`
+            : maxed
+              ? `${boosterDuration(level)}s AT START · MAXED`
+              : `${boosterDuration(level)}s → ${boosterDuration(level + 1)}s AT START`,
+          `ARM COST PER RUN: ${def.armCost} COINS`,
+        ],
+        buyLabel: (cost) => (level === 0 ? `UNLOCK · ${cost}` : `UPGRADE · ${cost}`),
+      };
+    }),
+    (() => {
+      const level = boosterLevels.shield;
+      const maxed = level >= MAX_BOOSTER_LEVEL;
+      return {
+        id: 'shield' as UpgradableId,
+        name: 'SHIELD',
+        level,
+        lines: [
+          'In-game drop: a bubble of full immunity.',
+          maxed
+            ? `${shieldDuration(level)}s PER PICKUP · MAXED`
+            : `${shieldDuration(level)}s → ${shieldDuration(level + 1)}s PER PICKUP`,
+          'NO UNLOCK NEEDED · ALWAYS DROPS',
+        ],
+        buyLabel: (cost: number) => `UPGRADE · ${cost}`,
+      };
+    })(),
+  ];
+
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <Text style={[styles.title, { color: palette.accent }]}>SHOP</Text>
       <View style={styles.walletRow}>
         <PixelSprite map={COIN} pixel={3} />
         <Text style={[styles.walletText, { color: palette.text }]}>{coins}</Text>
       </View>
       <Text style={[styles.blurb, { color: palette.textDim }]}>
-        UPGRADES RAISE DURATION · ARMING A RUN COSTS COINS
+        UPGRADES RAISE DURATION · REVIVES COST GEMS, NOT COINS
       </Text>
 
-      {BOOSTER_IDS.map((id) => {
-        const def = BOOSTERS[id];
-        const level = boosterLevels[id];
-        const cost = upgradeCost(level);
+      {cards.map((card) => {
+        const cost = upgradeCost(card.level);
         const maxed = cost == null;
-        const now = boosterDuration(level);
-        const next = boosterDuration(level + 1);
         return (
           <View
-            key={id}
+            key={card.id}
             style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}
           >
             <View style={styles.cardHeader}>
-              <Text style={[styles.cardName, { color: palette.text }]}>{def.name}</Text>
+              <Text style={[styles.cardName, { color: palette.text }]}>{card.name}</Text>
               <Text style={[styles.cardLevel, { color: palette.accent }]}>
-                LV {level}/{MAX_BOOSTER_LEVEL}
+                LV {card.level}/{MAX_BOOSTER_LEVEL}
               </Text>
             </View>
-            <Text style={[styles.cardDesc, { color: palette.textDim }]}>{def.description}</Text>
-            <Text style={[styles.cardDesc, { color: palette.textDim }]}>
-              {level === 0
-                ? `UNLOCK: ${next}s AT START`
-                : maxed
-                  ? `${now}s AT START · MAXED`
-                  : `${now}s → ${next}s AT START`}
-            </Text>
-            <Text style={[styles.cardDesc, { color: palette.textDim }]}>
-              ARM COST PER RUN: {def.armCost} COINS
-            </Text>
+            {card.lines.map((line, i) => (
+              <Text key={i} style={[styles.cardDesc, { color: palette.textDim }]}>
+                {line}
+              </Text>
+            ))}
             <RetroButton
-              label={maxed ? 'MAX LEVEL' : level === 0 ? `UNLOCK · ${cost}` : `UPGRADE · ${cost}`}
-              onPress={() => onUpgrade(id)}
+              label={maxed ? 'MAX LEVEL' : card.buyLabel(cost)}
+              onPress={() => onUpgrade(card.id)}
               size="small"
               disabled={maxed || (cost != null && coins < cost)}
               style={styles.cardButton}
@@ -75,16 +114,17 @@ export function ShopScreen({ coins, boosterLevels, onUpgrade, onBack }: Props) {
       })}
 
       <RetroButton label="BACK" onPress={onBack} variant="ghost" size="small" style={styles.back} />
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
+    paddingVertical: 60,
   },
   title: {
     fontFamily: FONT,

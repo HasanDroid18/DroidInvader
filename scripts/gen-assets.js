@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Regenerates the app icons/splash from the Claude spider pixel map.
+// Regenerates the app icons/splash from the droid robot pixel map.
 // Zero-dependency PNG writer (node zlib + hand-rolled chunks).
 // Usage: node scripts/gen-assets.js
 
@@ -7,23 +7,25 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-const BG = '#1A1915';
-const TERRACOTTA = '#CC785C';
-const EYE = '#1F1B16';
+const BG = '#0F1210';
+const DROID_GREEN = '#3DDC84';
+const EYE = '#FFFFFF';
 
-// Keep in sync with src/sprites/index.ts (SPIDER).
-const SPIDER = [
-  '..SSSSSSSSSSS..',
-  '..SSSSSSSSSSS..',
-  '..SEESSSSSEES..',
-  '..SEESSSSSEES..',
-  'SSSSSSSSSSSSSSS',
-  'SSSSSSSSSSSSSSS',
-  '..SSSSSSSSSSS..',
-  '..SSSSSSSSSSS..',
-  '...S..S..S..S..',
-  '...S..S..S..S..',
-  '...S..S..S..S..',
+// Keep in sync with src/sprites/index.ts (ROBOT).
+const ROBOT = [
+  '..R.........R..',
+  '...R.......R...',
+  '..RRRRRRRRRRR..',
+  '.RRRRRRRRRRRRR.',
+  '.RRWWRRRRRWWRR.',
+  '.RRRRRRRRRRRRR.',
+  '...............',
+  'RR.RRRRRRRRR.RR',
+  'RR.RRRRRRRRR.RR',
+  'RR.RRRRRRRRR.RR',
+  '...RRRRRRRRR...',
+  '....RR...RR....',
+  '....RR...RR....',
 ];
 
 // --- minimal PNG encoder -----------------------------------------------
@@ -113,12 +115,12 @@ function fillRect(cv, x, y, w, h, rgba) {
   }
 }
 
-function drawSpider(cv, scale, palette) {
-  const cols = SPIDER[0].length;
-  const rows = SPIDER.length;
+function drawRobot(cv, scale, palette) {
+  const cols = ROBOT[0].length;
+  const rows = ROBOT.length;
   const ox = Math.round((cv.w - cols * scale) / 2);
   const oy = Math.round((cv.h - rows * scale) / 2);
-  SPIDER.forEach((row, y) => {
+  ROBOT.forEach((row, y) => {
     for (let x = 0; x < row.length; x++) {
       const ch = row[x];
       if (ch === '.') continue;
@@ -130,8 +132,8 @@ function drawSpider(cv, scale, palette) {
 // --- outputs --------------------------------------------------------------
 
 const assetsDir = path.join(__dirname, '..', 'assets');
-const spiderPalette = { S: hexToRgba(TERRACOTTA), E: hexToRgba(EYE) };
-const whitePalette = { S: [255, 255, 255, 255], E: [0, 0, 0, 0] };
+const robotPalette = { R: hexToRgba(DROID_GREEN), W: hexToRgba(EYE) };
+const whitePalette = { R: [255, 255, 255, 255], W: [255, 255, 255, 255] };
 
 function write(name, cv) {
   fs.writeFileSync(path.join(assetsDir, name), encodePNG(cv.w, cv.h, cv.data));
@@ -139,24 +141,24 @@ function write(name, cv) {
 }
 
 let cv = makeCanvas(1024, 1024, BG);
-drawSpider(cv, 52, spiderPalette);
+drawRobot(cv, 48, robotPalette);
 write('icon.png', cv);
 
 cv = makeCanvas(1024, 1024, null);
-drawSpider(cv, 40, spiderPalette); // stays inside the adaptive-icon safe zone
+drawRobot(cv, 38, robotPalette); // stays inside the adaptive-icon safe zone
 write('android-icon-foreground.png', cv);
 
 cv = makeCanvas(1024, 1024, BG);
 write('android-icon-background.png', cv);
 
 cv = makeCanvas(1024, 1024, null);
-drawSpider(cv, 40, whitePalette);
+drawRobot(cv, 38, whitePalette);
 write('android-icon-monochrome.png', cv);
 
 cv = makeCanvas(512, 512, null);
-drawSpider(cv, 24, spiderPalette);
+drawRobot(cv, 22, robotPalette);
 write('splash-icon.png', cv);
 
 cv = makeCanvas(48, 48, BG);
-drawSpider(cv, 3, spiderPalette);
+drawRobot(cv, 3, robotPalette);
 write('favicon.png', cv);

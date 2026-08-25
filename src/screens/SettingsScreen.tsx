@@ -4,7 +4,7 @@ import { sfx } from '../audio/sfx';
 import { PixelSprite } from '../components/PixelSprite';
 import { RetroButton } from '../components/RetroButton';
 import { Settings } from '../storage/profile';
-import { SPIDER_COLORS } from '../theme/palettes';
+import { ROBOT_COLORS } from '../theme/palettes';
 import { FONT, useTheme } from '../theme/ThemeContext';
 
 interface Props {
@@ -14,7 +14,7 @@ interface Props {
 }
 
 export function SettingsScreen({ settings, onChange, onBack }: Props) {
-  const { palette, spiderMap } = useTheme();
+  const { palette, robotMap } = useTheme();
 
   return (
     <View style={styles.container}>
@@ -65,25 +65,25 @@ export function SettingsScreen({ settings, onChange, onBack }: Props) {
       </View>
 
       <View style={[styles.colorSection, { borderColor: palette.cardBorder }]}>
-        <Text style={[styles.label, { color: palette.text }]}>SPIDER COLOR</Text>
+        <Text style={[styles.label, { color: palette.text }]}>ROBOT COLOR</Text>
         <View style={styles.swatchRow}>
-          {SPIDER_COLORS.map((c) => (
+          {ROBOT_COLORS.map((c) => (
             <Pressable
               key={c.id}
               onPress={() => {
                 sfx.play('click');
-                onChange({ spiderColor: c.id });
+                onChange({ robotColor: c.id });
               }}
               style={[
                 styles.swatch,
                 { backgroundColor: c.hex },
-                settings.spiderColor === c.id && [styles.swatchSelected, { borderColor: palette.text }],
+                settings.robotColor === c.id && [styles.swatchSelected, { borderColor: palette.text }],
               ]}
             />
           ))}
         </View>
         <View style={styles.preview}>
-          <PixelSprite map={spiderMap} pixel={6} />
+          <PixelSprite map={robotMap} pixel={6} />
         </View>
       </View>
 

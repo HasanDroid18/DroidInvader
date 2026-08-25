@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT,
     fontSize: 34,
     letterSpacing: 8,
-    color: GAME_COLORS.errorRed,
+    color: GAME_COLORS.danger,
     fontWeight: 'bold',
   },
   waveText: {
@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT,
     fontSize: 16,
     letterSpacing: 3,
-    color: GAME_COLORS.warnYellow,
+    color: GAME_COLORS.highlight,
     marginBottom: 16,
   },
   best: {

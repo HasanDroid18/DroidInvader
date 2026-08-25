@@ -1,4 +1,4 @@
-import { DEFAULT_SPIDER_COLOR, GAME_COLORS } from '../theme/palettes';
+import { DEFAULT_ROBOT_COLOR, GAME_COLORS } from '../theme/palettes';
 
 // Pixel-art sprites as character maps. '.' is transparent; every other char
 // looks up a color in the palette. Rendered by components/PixelSprite.
@@ -9,29 +9,32 @@ export interface PixelMap {
   palette: Record<string, string>;
 }
 
-// The Claude Code spider from the reference art: rounded body, two square
-// eyes, stubby side arms and four legs. Body color is skinnable (Settings).
-const SPIDER_ROWS = [
-  '..SSSSSSSSSSS..',
-  '..SSSSSSSSSSS..',
-  '..SEESSSSSEES..',
-  '..SEESSSSSEES..',
-  'SSSSSSSSSSSSSSS',
-  'SSSSSSSSSSSSSSS',
-  '..SSSSSSSSSSS..',
-  '..SSSSSSSSSSS..',
-  '...S..S..S..S..',
-  '...S..S..S..S..',
-  '...S..S..S..S..',
+// The hero: a little droid robot — antennae, round head with eyes, body
+// flanked by arms, two legs. Body color is skinnable (Settings).
+const ROBOT_ROWS = [
+  '..R.........R..',
+  '...R.......R...',
+  '..RRRRRRRRRRR..',
+  '.RRRRRRRRRRRRR.',
+  '.RRWWRRRRRWWRR.',
+  '.RRRRRRRRRRRRR.',
+  '...............',
+  'RR.RRRRRRRRR.RR',
+  'RR.RRRRRRRRR.RR',
+  'RR.RRRRRRRRR.RR',
+  '...RRRRRRRRR...',
+  '....RR...RR....',
+  '....RR...RR....',
 ];
 
-export function makeSpiderMap(bodyHex: string): PixelMap {
-  return { rows: SPIDER_ROWS, palette: { S: bodyHex, E: GAME_COLORS.eye } };
+export function makeRobotMap(bodyHex: string): PixelMap {
+  return { rows: ROBOT_ROWS, palette: { R: bodyHex, W: '#FFFFFF' } };
 }
 
-export const SPIDER: PixelMap = makeSpiderMap(DEFAULT_SPIDER_COLOR.hex);
+export const ROBOT: PixelMap = makeRobotMap(DEFAULT_ROBOT_COLOR.hex);
 
-export const BUG: PixelMap = {
+// Basic alien: the classic invader crab (olive green).
+export const ALIEN_CRAB: PixelMap = {
   rows: [
     '..G.....G..',
     '...G...G...',
@@ -42,40 +45,35 @@ export const BUG: PixelMap = {
     'G.G.....G.G',
     '...GG.GG...',
   ],
-  palette: { G: GAME_COLORS.bugGreen, D: GAME_COLORS.bugDark },
+  palette: { G: GAME_COLORS.alienBasic, D: GAME_COLORS.alienBasicDark },
 };
 
-export const ERROR_GLYPH: PixelMap = {
+// Tough alien: a dark-green squid with red eyes (2 HP, dive-bombs).
+export const ALIEN_SQUID: PixelMap = {
   rows: [
-    'RR.....RR',
-    'RRR...RRR',
-    '.RRR.RRR.',
-    '..RRRRR..',
-    '...RRR...',
-    '..RRRRR..',
-    '.RRR.RRR.',
-    'RRR...RRR',
-    'RR.....RR',
+    '...GGGGG...',
+    '.GGGGGGGGG.',
+    'GGRRGGGRRGG',
+    'GGGGGGGGGGG',
+    'G.G.G.G.G.G',
+    '.G..G.G..G.',
   ],
-  palette: { R: GAME_COLORS.errorRed },
+  palette: { G: GAME_COLORS.alienTough, R: GAME_COLORS.alienToughEye },
 };
 
-export const WARN_GLYPH: PixelMap = {
+// Shooter alien: a chartreuse saucer with a dark visor (fires from the top row).
+export const ALIEN_SAUCER: PixelMap = {
   rows: [
-    '.....Y.....',
-    '....YYY....',
-    '....YDY....',
-    '...YYDYY...',
-    '...YYDYY...',
-    '..YYYDYYY..',
-    '..YYYYYYY..',
-    '.YYYYDYYYY.',
-    'YYYYYYYYYYY',
+    '.....G.....',
+    '...GGGGG...',
+    '.GGGDDDGGG.',
+    'GGGGGGGGGGG',
+    '.G..G.G..G.',
   ],
-  palette: { Y: GAME_COLORS.warnYellow, D: GAME_COLORS.eye },
+  palette: { G: GAME_COLORS.alienShooter, D: GAME_COLORS.alienShooterDark },
 };
 
-// The every-10th-wave monster: a giant horned mega-bug.
+// The every-10th-wave monster: a giant horned mother alien.
 export const BOSS: PixelMap = {
   rows: [
     '...BB...........BB...',
@@ -94,18 +92,6 @@ export const BOSS: PixelMap = {
     '..BB...BB...BB...BB..',
   ],
   palette: { B: GAME_COLORS.boss, E: GAME_COLORS.bossEye, T: GAME_COLORS.bossTeeth },
-};
-
-export const COIN: PixelMap = {
-  rows: [
-    '.CCCC.',
-    'CddddC',
-    'CdCCdC',
-    'CdCCdC',
-    'CddddC',
-    '.CCCC.',
-  ],
-  palette: { C: GAME_COLORS.coin, d: GAME_COLORS.coinDark },
 };
 
 export const GEM: PixelMap = {
@@ -130,6 +116,18 @@ export const POWERUP_SHIELD: PixelMap = {
     '.SSSS.',
   ],
   palette: { S: GAME_COLORS.shield },
+};
+
+export const COIN: PixelMap = {
+  rows: [
+    '.CCCC.',
+    'CddddC',
+    'CdCCdC',
+    'CdCCdC',
+    'CddddC',
+    '.CCCC.',
+  ],
+  palette: { C: GAME_COLORS.coin, d: GAME_COLORS.coinDark },
 };
 
 export const POWERUP_DOUBLE: PixelMap = {

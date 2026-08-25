@@ -129,7 +129,7 @@ export interface RunOptions {
   rapidDuration?: number; // s of rapid fire from the armed booster
   scoreMultDuration?: number; // s of x2 score from the armed booster
   shieldLevel?: number; // shop level; sets the duration of shield pickups
-  spiderColorHex?: string;
+  robotColorHex?: string;
 }
 
 // Per-step happenings the UI reacts to (sfx, haptics, screen transitions).

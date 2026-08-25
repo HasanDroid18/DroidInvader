@@ -1,7 +1,7 @@
 import * as C from '../constants';
 import { reviveCost, shieldDuration } from '../progression/boosters';
-import { SPIDER, spriteCols, spriteRows } from '../sprites';
-import { DEFAULT_SPIDER_COLOR, GAME_COLORS } from '../theme/palettes';
+import { ROBOT, spriteCols, spriteRows } from '../sprites';
+import { DEFAULT_ROBOT_COLOR, GAME_COLORS } from '../theme/palettes';
 import { bossParams, createBoss, stepBoss } from './boss';
 import { intersects } from './collision';
 import {
@@ -15,8 +15,8 @@ import {
 } from './types';
 import { createWave, isBossWave, waveParams } from './waves';
 
-const PLAYER_W = spriteCols(SPIDER) * C.PIXEL;
-const PLAYER_H = spriteRows(SPIDER) * C.PIXEL;
+const PLAYER_W = spriteCols(ROBOT) * C.PIXEL;
+const PLAYER_H = spriteRows(ROBOT) * C.PIXEL;
 
 const KILL_SCORE: Record<Enemy['kind'], number> = {
   bug: C.SCORE_BUG,
@@ -25,9 +25,9 @@ const KILL_SCORE: Record<Enemy['kind'], number> = {
 };
 
 const ENEMY_COLOR: Record<Enemy['kind'], string> = {
-  bug: GAME_COLORS.bugGreen,
-  warn: GAME_COLORS.warnYellow,
-  error: GAME_COLORS.errorRed,
+  bug: GAME_COLORS.alienBasic,
+  warn: GAME_COLORS.alienShooter,
+  error: GAME_COLORS.alienTough,
 };
 
 export function createGameState(
@@ -48,7 +48,7 @@ export function createGameState(
     revivesUsed: 0,
     shieldPickupDuration: shieldDuration(options.shieldLevel ?? 0),
     scoreMultTime: options.scoreMultDuration ?? 0,
-    playerColor: options.spiderColorHex ?? DEFAULT_SPIDER_COLOR.hex,
+    playerColor: options.robotColorHex ?? DEFAULT_ROBOT_COLOR.hex,
     gameOver: false,
     player: {
       x: screenW / 2 - PLAYER_W / 2,

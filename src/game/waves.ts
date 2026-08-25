@@ -3,7 +3,7 @@ import {
   FORMATION_SLOT_W,
   PIXEL,
 } from '../constants';
-import { BUG, ERROR_GLYPH, WARN_GLYPH, spriteCols, spriteRows } from '../sprites';
+import { ALIEN_CRAB, ALIEN_SAUCER, ALIEN_SQUID, spriteCols, spriteRows } from '../sprites';
 import { Enemy, EnemyKind } from './types';
 
 // Everything about wave N is derived here so difficulty scales in one place.
@@ -60,9 +60,9 @@ export function isSwarmWave(n: number): boolean {
 }
 
 export const ENEMY_SIZES: Record<EnemyKind, { w: number; h: number }> = {
-  bug: { w: spriteCols(BUG) * PIXEL, h: spriteRows(BUG) * PIXEL },
-  error: { w: spriteCols(ERROR_GLYPH) * PIXEL, h: spriteRows(ERROR_GLYPH) * PIXEL },
-  warn: { w: spriteCols(WARN_GLYPH) * PIXEL, h: spriteRows(WARN_GLYPH) * PIXEL },
+  bug: { w: spriteCols(ALIEN_CRAB) * PIXEL, h: spriteRows(ALIEN_CRAB) * PIXEL },
+  error: { w: spriteCols(ALIEN_SQUID) * PIXEL, h: spriteRows(ALIEN_SQUID) * PIXEL },
+  warn: { w: spriteCols(ALIEN_SAUCER) * PIXEL, h: spriteRows(ALIEN_SAUCER) * PIXEL },
 };
 
 const BASE_HP: Record<EnemyKind, number> = { bug: 1, warn: 1, error: 2 };

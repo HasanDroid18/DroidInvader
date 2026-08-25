@@ -1,13 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MAX_BOOSTER_LEVEL, UpgradableId } from '../progression/boosters';
-import { SPIDER_COLORS, ThemeName } from '../theme/palettes';
+import { ROBOT_COLORS, ThemeName } from '../theme/palettes';
 
 // Single persisted blob for everything the game remembers between launches.
 
 export interface Settings {
   soundOn: boolean;
   theme: ThemeName;
-  spiderColor: string; // id from SPIDER_COLORS
+  robotColor: string; // id from ROBOT_COLORS
 }
 
 export interface Profile {
@@ -19,7 +19,9 @@ export interface Profile {
   settings: Settings;
 }
 
-const PROFILE_KEY = 'claude-invader/profile-v1';
+const PROFILE_KEY = 'droid-invader/profile-v1';
+// Keys used by earlier builds of the game, migrated on first load.
+const OLD_PROFILE_KEY = 'claude-invader/profile-v1';
 const LEGACY_HIGHSCORE_KEY = 'claude-invader/high-score';
 
 export const STARTING_GEMS = 50; // the free welcome gift
@@ -30,7 +32,7 @@ export const DEFAULT_PROFILE: Profile = {
   coins: 0,
   gems: STARTING_GEMS,
   boosterLevels: { rapid: 0, score2x: 0, shield: 0 },
-  settings: { soundOn: true, theme: 'dark', spiderColor: 'terracotta' },
+  settings: { soundOn: true, theme: 'dark', robotColor: 'green' },
 };
 
 function clampInt(v: unknown, min: number, max: number, fallback: number): number {
@@ -60,9 +62,13 @@ export function normalizeProfile(raw: unknown): Profile {
     settings: {
       soundOn: typeof settings.soundOn === 'boolean' ? settings.soundOn : true,
       theme: settings.theme === 'light' ? 'light' : 'dark',
-      spiderColor: SPIDER_COLORS.some((c) => c.id === settings.spiderColor)
-        ? (settings.spiderColor as string)
-        : 'terracotta',
+      // Old profiles stored this as `spiderColor` with different skin ids;
+      // anything unknown falls back to the droid green.
+      robotColor: ROBOT_COLORS.some(
+        (c) => c.id === (settings.robotColor ?? settings.spiderColor)
+      )
+        ? ((settings.robotColor ?? settings.spiderColor) as string)
+        : 'green',
     },
   };
 }
@@ -72,9 +78,15 @@ export async function loadProfile(): Promise<Profile> {
     const json = await AsyncStorage.getItem(PROFILE_KEY);
     if (json != null) return normalizeProfile(JSON.parse(json));
 
-    // First run of this version: pull the high score saved by older builds.
-    const legacy = await AsyncStorage.getItem(LEGACY_HIGHSCORE_KEY);
-    const migrated = normalizeProfile({ highScore: legacy ? parseInt(legacy, 10) : 0 });
+    // First run of this version: migrate whatever an older build saved.
+    const oldJson = await AsyncStorage.getItem(OLD_PROFILE_KEY);
+    let migrated: Profile;
+    if (oldJson != null) {
+      migrated = normalizeProfile(JSON.parse(oldJson));
+    } else {
+      const legacy = await AsyncStorage.getItem(LEGACY_HIGHSCORE_KEY);
+      migrated = normalizeProfile({ highScore: legacy ? parseInt(legacy, 10) : 0 });
+    }
     await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(migrated));
     return migrated;
   } catch {

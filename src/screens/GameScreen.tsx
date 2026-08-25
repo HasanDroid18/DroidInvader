@@ -17,25 +17,25 @@ import { createGameState, nextReviveCost, revive, step } from '../game/engine';
 import { GameState, RunOptions, StepEvents, StepInput } from '../game/types';
 import { isBossWave } from '../game/waves';
 import {
+  ALIEN_CRAB,
+  ALIEN_SAUCER,
+  ALIEN_SQUID,
   BOSS,
-  BUG,
   COIN,
-  ERROR_GLYPH,
   GEM,
   PixelMap,
   POWERUP_DOUBLE,
   POWERUP_LIFE,
   POWERUP_RAPID,
   POWERUP_SHIELD,
-  WARN_GLYPH,
 } from '../sprites';
 import { GAME_COLORS } from '../theme/palettes';
 import { FONT, useTheme } from '../theme/ThemeContext';
 
 const ENEMY_SPRITES: Record<'bug' | 'error' | 'warn', PixelMap> = {
-  bug: BUG,
-  error: ERROR_GLYPH,
-  warn: WARN_GLYPH,
+  bug: ALIEN_CRAB,
+  error: ALIEN_SQUID,
+  warn: ALIEN_SAUCER,
 };
 
 const POWERUP_SPRITES = {
@@ -86,11 +86,11 @@ function playStepSfx(ev: StepEvents) {
 
 export function GameScreen({ runOptions, gems, onSpendGems, onGameOver, onQuit }: Props) {
   const { width, height } = useWindowDimensions();
-  const { palette, spiderMap, spiderHex } = useTheme();
+  const { palette, robotMap, robotHex } = useTheme();
 
   const stateRef = useRef<GameState | null>(null);
   if (stateRef.current == null) {
-    stateRef.current = createGameState(width, height, { ...runOptions, spiderColorHex: spiderHex });
+    stateRef.current = createGameState(width, height, { ...runOptions, robotColorHex: robotHex });
   }
 
   const [, forceRender] = useReducer((c: number) => c + 1, 0);
@@ -165,7 +165,7 @@ export function GameScreen({ runOptions, gems, onSpendGems, onGameOver, onQuit }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reviveCost]);
 
-  // Relative dragging: the spider follows finger *movement*, so the finger
+  // Relative dragging: the robot follows finger *movement*, so the finger
   // never has to sit on top of the sprite.
   const pan = useRef(
     PanResponder.create({
@@ -389,7 +389,7 @@ export function GameScreen({ runOptions, gems, onSpendGems, onGameOver, onQuit }
               },
             ]}
           >
-            <PixelSprite map={spiderMap} pixel={PIXEL} />
+            <PixelSprite map={robotMap} pixel={PIXEL} />
           </View>
         </>
       )}
@@ -405,7 +405,7 @@ export function GameScreen({ runOptions, gems, onSpendGems, onGameOver, onQuit }
               style={[
                 styles.bossBarFill,
                 {
-                  backgroundColor: s.boss.enraged ? GAME_COLORS.errorRed : GAME_COLORS.boss,
+                  backgroundColor: s.boss.enraged ? GAME_COLORS.danger : GAME_COLORS.boss,
                   width: `${Math.max((s.boss.hp / s.boss.maxHp) * 100, 0)}%`,
                 },
               ]}
@@ -421,7 +421,7 @@ export function GameScreen({ runOptions, gems, onSpendGems, onGameOver, onQuit }
           <Text style={[styles.hudScore, { color: palette.text }]}>{s.score}</Text>
           <View style={styles.livesRow}>
             {Array.from({ length: s.lives }).map((_, i) => (
-              <PixelSprite key={i} map={spiderMap} pixel={1.4} style={styles.lifeIcon} />
+              <PixelSprite key={i} map={robotMap} pixel={1.4} style={styles.lifeIcon} />
             ))}
           </View>
         </View>

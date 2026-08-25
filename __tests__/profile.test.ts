@@ -12,13 +12,13 @@ describe('normalizeProfile', () => {
       coins: 55,
       gems: 7,
       boosterLevels: { rapid: 3, score2x: 10, shield: 4 },
-      settings: { soundOn: false, theme: 'light', spiderColor: 'violet' },
+      settings: { soundOn: false, theme: 'light', robotColor: 'violet' },
     });
     expect(p.highScore).toBe(1234);
     expect(p.coins).toBe(55);
     expect(p.gems).toBe(7);
     expect(p.boosterLevels).toEqual({ rapid: 3, score2x: 10, shield: 4 });
-    expect(p.settings).toEqual({ soundOn: false, theme: 'light', spiderColor: 'violet' });
+    expect(p.settings).toEqual({ soundOn: false, theme: 'light', robotColor: 'violet' });
   });
 
   it('gifts 50 gems to new installs and pre-gems profiles', () => {
@@ -31,6 +31,12 @@ describe('normalizeProfile', () => {
     expect(normalizeProfile({ gems: 0 }).gems).toBe(0);
   });
 
+  it('migrates the old spiderColor setting to robotColor', () => {
+    // Same skin ids carry over; retired ids fall back to droid green.
+    expect(normalizeProfile({ settings: { spiderColor: 'violet' } }).settings.robotColor).toBe('violet');
+    expect(normalizeProfile({ settings: { spiderColor: 'terracotta' } }).settings.robotColor).toBe('green');
+  });
+
   it('migrates a bare legacy high score', () => {
     expect(normalizeProfile({ highScore: 900 }).highScore).toBe(900);
   });
@@ -41,12 +47,12 @@ describe('normalizeProfile', () => {
       coins: 'lots',
       gems: -3,
       boosterLevels: { rapid: 999, score2x: -1, shield: 'max' },
-      settings: { soundOn: 'yes', theme: 'neon', spiderColor: 'plaid' },
+      settings: { soundOn: 'yes', theme: 'neon', robotColor: 'plaid' },
     });
     expect(p.highScore).toBe(0);
     expect(p.coins).toBe(0);
     expect(p.gems).toBe(0);
     expect(p.boosterLevels).toEqual({ rapid: 10, score2x: 0, shield: 0 });
-    expect(p.settings).toEqual({ soundOn: true, theme: 'dark', spiderColor: 'terracotta' });
+    expect(p.settings).toEqual({ soundOn: true, theme: 'dark', robotColor: 'green' });
   });
 });

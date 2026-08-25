@@ -1,18 +1,18 @@
 {
   "expo": {
-    "name": "Claude Invader",
-    "slug": "claude-invader",
+    "name": "Droid Invader",
+    "slug": "droid-invader",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "backgroundColor": "#1A1915",
+    "backgroundColor": "#0F1210",
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#1A1915",
+        "backgroundColor": "#0F1210",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

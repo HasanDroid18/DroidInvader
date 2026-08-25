@@ -37,7 +37,7 @@ export function MenuScreen({
   onShop,
   onSettings,
 }: Props) {
-  const { palette, spiderMap } = useTheme();
+  const { palette, robotMap } = useTheme();
   const bob = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -63,10 +63,10 @@ export function MenuScreen({
         <Text style={[styles.walletText, { color: palette.text }]}>{gems}</Text>
       </View>
 
-      <Text style={[styles.title, { color: palette.accent }]}>CLAUDE</Text>
+      <Text style={[styles.title, { color: palette.accent }]}>DROID</Text>
       <Text style={[styles.subtitle, { color: palette.text }]}>INVADER</Text>
       <Animated.View style={{ transform: [{ translateY }], marginVertical: 26 }}>
-        <PixelSprite map={spiderMap} pixel={8} />
+        <PixelSprite map={robotMap} pixel={8} />
       </Animated.View>
       <Text style={[styles.highScore, { color: palette.textDim }]}>
         {highScore > 0 ? `HIGH SCORE  ${highScore}` : 'NO HIGH SCORE YET'}
